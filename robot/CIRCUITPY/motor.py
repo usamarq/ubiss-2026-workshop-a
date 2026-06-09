@@ -83,4 +83,12 @@ class StepperMotor:
 
                     next_step += self.step_interval
 
+            else:
+                # Idle: keep the schedule pinned to "now". Otherwise next_step
+                # falls behind during pauses (e.g. 0.6 s sensor reads) and the
+                # next move fires a catch-up burst faster than the motor can
+                # physically turn - stalling it while the position counter
+                # still advances.
+                next_step = time.monotonic()
+
             await asyncio.sleep(0)
