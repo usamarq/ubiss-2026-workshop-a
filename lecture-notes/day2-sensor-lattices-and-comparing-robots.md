@@ -23,12 +23,35 @@ A **partial order** is a way of saying "this is ≤ that" on a set, obeying thre
 
 ---
 
-## 2 · Lattice
-A **lattice** is a partial order where **every pair** of elements `a, b` has both:
-- a **join** `a ∨ b` — the **least upper bound**: the *smallest* element that is ≥ both, and
-- a **meet** `a ∧ b` — the **greatest lower bound**: the *largest* element that is ≤ both.
+## 2 · Upper/lower bounds → Lattice
+Take a partial order and any two elements `a, b`:
+- An **upper bound** = an element that sits **≥ both** `a` and `b`.
+- A **lower bound** = an element that sits **≤ both**.
+- The **least upper bound (LUB)**, a.k.a. **join** `a ∨ b` = the *smallest* of all the upper bounds.
+- The **greatest lower bound (GLB)**, a.k.a. **meet** `a ∧ b` = the *largest* of all the lower bounds.
 
-> 🧮 **Plain version.** A lattice is a poset where any two things have a well-defined *"smallest thing sitting above both"* (join) and *"biggest thing sitting below both"* (meet). Example — **subsets under `⊆`**: `join = union (∪)`, `meet = intersection (∩)`; the **top `⊤`** is the whole set, the **bottom `⊥`** is the empty set. (Numbers under `≤`: join = max, meet = min.)
+A **lattice** = a partial order in which **every pair has both a LUB and a GLB**.
+
+> 🧮 **Plain version.** "Upper bounds of `a` and `b`" = everything sitting above *both*; the **join** is the *lowest* such ceiling. "Lower bounds" = everything below both; the **meet** is the *highest* such floor. A lattice just guarantees those two always exist. (Numbers under `≤`: join = max, meet = min.)
+
+### The power-set (set-inclusion) lattice — the textbook example
+Take any set `S`. Its **power set** `P(S)` = the set of **all subsets** of `S` (including `∅` and `S` itself). Order them by **inclusion `⊆`** → a lattice:
+- **join = union `∪`** · **meet = intersection `∩`**
+- **top `⊤` = S`** (the whole set) · **bottom `⊥` = ∅`** (empty set)
+
+> 🧮 **Power set.** "All possible subsets." If `S` has `n` elements, `P(S)` has `2ⁿ`. For `S = {a,b,c}` (2³ = 8 subsets) the Hasse diagram is a *cube*:
+> ```
+>         {a,b,c}        ⊤  (whole set)
+>        /   |   \
+>    {a,b} {a,c} {b,c}   size-2 subsets
+>        \   |   /
+>     {a}  {b}  {c}      size-1 subsets
+>        \   |   /
+>          { }           ⊥  (empty set)
+> ```
+> _(each set links upward to every set that contains it; drawn fully it's a cube.)_ Two subsets like `{a}` and `{b}` are **incomparable** — neither contains the other — so again the order is *partial*.
+
+🔗 **Why this is THE example for us:** a sensor's knowledge is a *set* of possible states, and the **nondeterministic information space is exactly `pow(X)`** (from `day2-information-spaces`). So the set-inclusion lattice is the natural home for reasoning about what a robot can or can't rule out.
 
 ---
 
@@ -75,12 +98,13 @@ The order on sensors has a name: **dominance**.
 
 ## 🎯 Likely exam points
 - Define a **partial order** (3 rules) and why it's "partial" (incomparable elements); contrast with a total order.
-- Define a **lattice** (join = least upper bound, meet = greatest lower bound); give the subset example.
+- Define **upper / lower bound** and **LUB (join) / GLB (meet)**; define a **lattice**; give the **power-set (set-inclusion) lattice** (join = `∪`, meet = `∩`, top = `S`, bottom = `∅`).
 - Explain the **dominance** order on sensors (A dominates B = A's partition refines B's = A at least as informative); name the top (perfect) and bottom (null).
 - Use it to **compare two robots** / pick a **minimal sufficient** sensor.
 
 ## 📝 In-class notes (raw — Jun 9)
 - Intro to **partial order**, **lattices**, **sensor lattices**, **dominance partial order**, etc.
+- Also covered: **upper bounds / lower bounds** (→ LUB / GLB), and the **power-set / set-inclusion lattice** as the worked example.
 - _(add: any specific definitions, diagrams, or examples the instructor used — and the formal meet/join for sensors)_
 
 ## 📎 Slides
