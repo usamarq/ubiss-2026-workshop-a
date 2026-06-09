@@ -6,8 +6,8 @@ import analogio
 from motor import StepperMotor
 
 # ---- motors (differential drive) ----
-motor1 = StepperMotor(board.GP15, board.GP16, board.GP17, board.GP18, rpm=12)
-motor2 = StepperMotor(board.GP19, board.GP20, board.GP21, board.GP22, rpm=12)
+motor1 = StepperMotor(board.GP15, board.GP16, board.GP17, board.GP18, rpm=8)
+motor2 = StepperMotor(board.GP19, board.GP20, board.GP21, board.GP22, rpm=8)
 
 # ---- light sensors (photodiodes) ----
 sensorL = analogio.AnalogIn(board.GP28)
