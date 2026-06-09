@@ -41,12 +41,16 @@ SMOOTH_MS   = 10             # per-sample averaging window; >=10 ms cancels main
 DEADBAND_FRAC = 0.20         # turn only if |L-R| exceeds this fraction of the mean signal
                              # (relative, so it works at any distance/brightness)
 # steering: turn size scales with how off-centre the light is (proportional)
-TURN_GAIN = 900              # turn steps = TURN_GAIN * |L-R| / (L+R), clamped:
+TURN_GAIN = 1400             # turn steps = TURN_GAIN * |L-R| / (L+R), clamped:
+                             # (900 gave 3-5 deg nudges that never cancelled the
+                             #  leftward drift -> persistent RIGHT-arc in telemetry)
 TURN_MIN  = 60               #   barely off-centre -> small trim
 TURN_MAX  = 500              #   strongly off-centre -> one big correction (~15 deg)
 
 # stride: cover ground when far, fine-tune when near (levels from live telemetry)
-NEAR_LEVEL = 20000           # L+R above this = close to the beacon
+NEAR_LEVEL = 35000           # L+R above this = close to the beacon
+                             # (20000 tripped ~50 cm out per telemetry -> half the
+                             #  approach crawled in 2 cm steps; final dock sums ~50k)
 FWD_FAR    = 1200            # ~6 cm per advance when far
 FWD_NEAR   = 400             # ~2 cm per advance when near
 
