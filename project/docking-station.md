@@ -42,6 +42,16 @@ A 4-stage pipeline that replaces precise sensing/computation with **physical str
 
 **Why it fits the workshop:** minimal *information* (one hall-effect bit to know you're done), minimal *computation* (reactive light-seek — no map, no planner), and **embodiment doing the work** (funnel + magnet = sensorless final alignment). Targets the **"minimal," "most robust,"** and **"most creative"** prizes, and stays cheap if resources get "priced."
 
+### ⚠️ Robustness — ambient light (the photodiode homing stage)
+Ambient room light (ceiling panels, windows/sun, other teams) **will** affect a naïve "steer toward brightest" setup — it can saturate the diode, swamp the beacon, or lure the robot toward a window/lamp. Fixes, best bang-for-buck first:
+- **Modulate the beacon + synchronous detection (the key fix).** Blink the dock LED at a known rate (~1 kHz, away from mains 100/120 Hz flicker) and detect *only that flicker*. Simplest version: `signal = (diode while beacon ON) − (diode while OFF)` → steady ambient **cancels**. This is exactly how IR remotes / RoboCup IR beacons work in bright gyms.
+- **Differential pair** — steer on `left − right` photodiode; *uniform* ambient cancels (gradients still need modulation).
+- **Optical hoods + forward tilt** — small tubes around each diode, aimed forward (not at the ceiling) to reject overhead light.
+- **IR beacon + the APDS proximity channel** — the colour/gesture sensor (APDS-type) already does pulsed-IR with **built-in ambient rejection**; usable as an ambient-robust short-range cue.
+- **Inverse-square help** — the beacon dominates ambient as you approach, so SNR *improves* near the dock.
+
+**Design reassurance:** ambient light only threatens **coarse homing**. The **funnel + magnet + hall-effect** final stage is **completely light-immune**, and a *large catchment* (Round-1 env mods) means coarse homing only has to be roughly right → the layered design degrades gracefully. **Quick field test:** in the real arena, read the diode **beacon-off vs beacon-on at 1 m** — if the delta clears the ambient wobble, you're good; if not, modulate.
+
 ## Alternative approaches (comparison / fallback)
 - **B · Colour-trail line-follow (single sensor).** Lay **colored tape** from a wide catchment down to the tiny target; the robot spiral-searches until the **colour sensor** hits the tape, then follows it in; a distinct target colour = "arrived." Simpler, but final coverage is less guaranteed → pair with a small funnel. Good fallback if **magnets are banned** in a later round.
 - **C · Vision homing — the "maximal" entry.** Use the **camera** to detect a marker and servo precisely onto the target. Heavy compute/precision (opposite of minimal) but could win the **"maximal"** prize — higher risk (lighting, compute, the −5 trap).
