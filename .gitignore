@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+.Trashes
+.fseventsd
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Editors
+.idea/
+*.swp
