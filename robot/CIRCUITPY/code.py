@@ -30,7 +30,7 @@ TURN_STEP = 80               # steps per steering pivot
 FWD_STEP  = 200              # steps per forward advance
 
 # 360 light-seek
-SPIN_STEP       = 120        # steps per scan step (smaller = finer scan)
+SPIN_STEP       = 360        # steps per scan step (~11 deg; smaller = finer but slower scan)
 FULL_TURN_STEPS = 12000      # steps for ONE full 360 in-place turn (CALIBRATE - see notes)
 LOST_LEVEL      = 800 if USE_FLICKER else 1500   # if L+R drops below this, seek again
 # ====================================================
