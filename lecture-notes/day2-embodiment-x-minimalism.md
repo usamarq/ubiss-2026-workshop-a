@@ -10,6 +10,7 @@ The robot's **physical body** can do work that would otherwise need sensing, com
 ## Key concepts
 - **Morphological computation** — shape, materials, and mechanics perform "computation" for free (no code, no sensors).
 - **Passive dynamics** — e.g. **passive dynamic walkers** that walk down a slope with no motors or control.
+- **Biological examples (raised in Lecture 1):** 🪳 **cockroach** running is stabilized by body mechanics ("preflexes") with no neural feedback; 🐟 a **trout** can hold station / swim upstream by exploiting **vortices** (the Kármán gait) with minimal muscle effort — body + environment doing the control. See `day1-introductions-and-roadmap`.
 - **Mechanics replacing sensing** — the tray's walls funnel a part (`tray-tilting`); a gripper's compliance aligns an object without measuring it.
 - **Reactive wiring** — Braitenberg vehicles get behaviour from body+wiring, not deliberation.
 - Trade-off: cleverer **body** ⇄ simpler **brain/sensing**. This is the seed of **co-design**.
