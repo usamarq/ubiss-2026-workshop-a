@@ -1,55 +1,60 @@
-# Minimalism as a Life Philosophy
+# Minimalism as a Life Philosophy (Lecture 1)
 
 > **Workshop A — Minimalism in Robotics** · UBISS 2026
-> Day 2 · Tue Jun 9 · Lecture · Fort TS128
-> Status: 🟢 in-class notes added (Jun 9)
+> Day 2 · Tue Jun 9 · Opening lecture · Fort TS128
+> Status: 🟢 **reconciled with the Lecture 1 slides** (Jun 9) · 🧮 = beginner explainer
 
 ## TL;DR
-The **history & philosophy** of minimalism — "simple robots" as a research stance — illustrated with the **RISC** analogy from computing, a couple of historical references, the **analytical tools** for reasoning about minimal systems (complexity, set theory, linear programming, average- vs worst-case), and **bio-inspired** examples where the *body* does the work.
+The "why" lecture: minimalism as a **research stance** — *what are the fewest resources necessary to perform a task?* — set in its **history**, with biological and historical examples where less is more.
 
-## History & philosophy of minimalism
-- **"Less is more"** as a design discipline and research stance: strip a robot to what a task *fundamentally* requires.
-- "Simple robots" as both a **scientific probe** (remove a resource → does the task still work?) and a **design ethos**.
-- Echoes broader ideas: **Occam's razor**; behaviour-based robotics ("intelligence without representation").
-- **RISC analogy** 💡 — *Reduced Instruction Set Computing*: a **smaller, simpler** instruction set beat complex (CISC) designs on speed/efficiency. A canonical case that **reducing** complexity can **increase** capability — the same bet minimal robotics makes.
-- Brief historical name-drops (mentioned in passing — confirm exact refs when you can):
-  - **T. Smithers (1994)** — situated / behaviour-based robotics; the *dynamical-systems* view of behaviour. (Plausibly his SAB'94 piece *"On Why Better Robots Make It Harder"* — **verify**.)
-  - **P. Cheeseman (1991)** — Bayesian / probabilistic approaches to AI & uncertainty. (Exact 1991 reference — **fill in**.)
+## The core question (slides)
+> **"What are the fewest resources necessary to perform some task?"**
+- A natural **theoretical** question · practically useful · intellectually deep · **remains mostly open**.
+- 👁️ **The Graeae** metaphor — three Titan sisters (Deino, Enyo, Pemphredo) who **share a single eye and a single tooth**, passing them around: doing the job with the bare minimum.
 
-## Analytical tools — how we reason about "minimal"
-- **Time & space complexity** — minimal robots minimize **computation (time)** and **memory (space)**; the formal yardsticks.
-- **Set theory** — reasoning about **possibilities**: a robot's knowledge as a **set** of possible states (exactly the nondeterministic I-state; predict/correct = set **union / intersection**). → `day2-information-spaces`
-- **Linear programming (LP)** — an optimization formulation; also the source of a complexity lesson ↓
-- **Average-case vs worst-case** ⭐
-  - **Worst-case** = cost on the **hardest** input of size *n* — a guarantee that always holds.
-  - **Average-case** = the **expected** cost over a **distribution of inputs** — *typical* behaviour averaged across inputs (not the one nasty input). Depends on the assumed input distribution.
-  - **LP example:** the **simplex** method is **exponential worst-case** (Klee–Minty) but **polynomial on average / in practice** (interior-point methods are polynomial even worst-case).
-  - **Takeaway:** worst-case bounds can be too pessimistic for what a robot *actually* encounters; don't over-build for cases that never occur.
+## A short history of minimalism in robotics (slides)
+A lineage of workshops:
+- **ICRA 1996** (K. Goldberg & A. Bicchi) — gave the working **definition**:
+  > *minimalism* = **"the pursuit of the least complex solution to a given class of tasks"** — e.g. the **fewest actuators / control variables (DOF)**, or the **simplest set of sensors**.
+- **RSS'08** (Ghrist, LaValle, Pappas) · **RSS'16** "Minimality + Design Automation" (Censi, O'Kane, **Shell**) · **RSS'17** "Minimality and Trade-offs in Automated Robot Design" (Censi, Kress-Gazit, **Nilles**, O'Kane).
+- (Your instructors **Nilles & Shell** are part of this lineage.)
 
-## Bio-inspired minimalism — the body does the work
-- 🪳 **Cockroach locomotion** — fast, stable running from **passive mechanical self-stabilization** ("preflexes"): body mechanics reject perturbations **without neural feedback** (Full & Koditschek). Stability almost "for free."
-- 🐟 **Trout locomotion** — a trout (even a **dead** one) extracts energy from **vortices** shed by an obstacle to hold station / swim upstream with little-to-no muscle effort (the **Kármán gait**) — exploiting the environment's own dynamics.
-- Both = **embodiment / morphological computation**: minimal sensing & control because **body + environment** do the work. → `day2-embodiment-x-minimalism`
+## Key observations & references — now confirmed ✅
+- **"More capable robots don't always make life easier."**
+  → ✅ **T. Smithers (1994), _"On why better robots make it harder,"_** *From Animals to Animats: Simulation of Adaptive Behavior*, pp. 64–72.
+- **"Constraints give different regimes"** · *"Creativity arises from constraints."*
+  → ✅ **P. Cheeseman et al. (1991), _"Where the Really Hard Problems Are,"_** IJCAI, pp. 331–337 — the hardest instances **cluster in a narrow band** (a phase-transition view of complexity). *This is where the complexity / average-vs-worst-case discussion fits.*
+
+## Historical & biological examples (slides)
+- 🐢 **Grey Walter's Tortoises** (≈1948–51) — early minimalist robots: **analog** (vacuum tubes), a **light sensor** + a **bump-sensor shell**, yet lifelike behaviour. Ancestor of Braitenberg-style reactive robots → `day1-braitenberg-vehicles`.
+- 🪳 **Cockroach locomotion** — fast, stable running from **passive mechanical self-stabilization** (Jindrich & Full, *J. Exp. Biol.*, 2006). Stability "for free."
+- 🐟 **Trout locomotion** — a trout — *even a **dead** one!* — extracts energy from **vortices** to hold station / swim upstream (Beal et al., *J. Fluid Mech.*, 2006). Body + environment doing the work.
+- 🤖 **"Vision-Language Models are Biased"** (Vo et al., ICML 2026) — a cautionary modern example, capped by **Feynman**: *"For a successful technology, honesty must take precedence over public relations, for nature cannot be fooled."*
+- 📐 **D'Arcy Thompson's "principle of negligibility"** (*On Growth and Form*) — don't be derailed by irrelevant detail: *"if Tycho Brahé's instruments had been ten times as exact there would have been no Kepler, no Newton."* Separate the **practical working robot** from the **theoretical narrative**.
+
+## Mentioned in discussion (not in this deck — verify)
+- The **RISC** analogy (reduced instruction set → simpler can be more powerful); **time & space complexity**, **set theory**, **linear programming**, **average- vs worst-case** (the simplex example). These came up verbally; the complexity thread connects to the **Cheeseman "really hard problems"** slide above.
+
+## Why it matters for *minimalism*
+The framing for the whole week — every later topic is an instance of *"how little is enough?"*
 
 ## Connections
-- The philosophical + foundational frame for the week → `day2-information-spaces`, `day2-sensor-lattices-and-comparing-robots`, `day4-information-invariants`, `day4-co-design`.
-- Bio examples → `day2-embodiment-x-minimalism`; complexity / LP → `day3-filters-plans-and-reduction-algorithms`.
+- Frames → `day2-information-spaces`, `day2-sensor-lattices-and-comparing-robots`, `day2-embodiment-x-minimalism`, `day4-information-invariants`, `day4-co-design`.
+- Bio examples + Grey Walter → `day2-embodiment-x-minimalism` & `day1-braitenberg-vehicles`.
 
 ## 🎯 Likely exam points
-*(These were brief mentions — aim to recognize/explain each in a sentence or two.)*
-- **RISC** as the minimalism analogy ("simpler can be more powerful").
-- **Average- vs worst-case** complexity, with the **simplex / LP** example.
-- One **bio example** of embodiment (cockroach self-stabilization, or the dead-trout / vortex effect).
-- Why minimal robots are scientifically & practically valuable.
+- State the **core question** ("fewest resources for a task") and the **1996 definition** of minimalism (fewest actuators/DOF, simplest sensors).
+- "**More capable robots don't always make life easier**" (Smithers 1994); "**constraints give different regimes**" (Cheeseman 1991, hard-problem phase transition).
+- Give a **historical** minimalist robot (Grey Walter's Tortoise) and a **biological** one (cockroach self-stabilization / dead-trout vortex gait).
 
-## 📝 In-class notes (raw — from class, Jun 9)
-- History of minimalism + philosophy; "simple robots".
-- RISC architecture example.
-- Brief refs: **T. Smithers 1994**, **P. Cheeseman 1991**.
-- Time & space complexity; set theory; linear programming; **average vs worst-case** tradeoff.
-- Cockroach locomotion; trout locomotion.
+## 📝 In-class notes (raw — Jun 9)
+- History + philosophy of minimalism; "simple robots"; the **Graeae** (shared eye/tooth).
+- Refs: Smithers 1994, Cheeseman 1991, Goldberg/Bicchi 1996 definition; Grey Walter's Tortoises; D'Arcy Thompson; VLM-biased + Feynman.
+- (Verbal) RISC; time/space complexity; set theory; linear programming; average vs worst-case.
+- Cockroach & trout locomotion.
+
+## 📎 Slides
+Reconciled against **`reading_material/lecture_slides/Lecture 1_ minimalism_as_a_life_philosophy.pdf`** (36 pp).
 
 ## ❓ Open questions
-- Exact **Smithers 1994** & **Cheeseman 1991** citations + why they were cited?
-- Was **LP** used for a specific robot formulation, or only as a complexity example?
-- How much complexity theory is examinable?
+- Was RISC / LP / average-vs-worst-case on a slide I'm missing, or purely verbal elaboration?

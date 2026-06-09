@@ -2,7 +2,7 @@
 
 > **Workshop A — Minimalism in Robotics** · UBISS 2026
 > Day 2 · Tue Jun 9 · Lecture + "Information space practice" · Fort TS128
-> Status: 🟢 in-class notes added (Jun 9) · **the core topic**
+> Status: 🟢 **reconciled with the Lecture 2 slides** (Jun 9) · **the core topic**
 >
 > 🧮 = beginner math explainer · **⟵ reconcile w/ slides** = I inferred this, cross-check when the slides are added.
 
@@ -21,7 +21,7 @@ Interaction happens in **discrete time**, indexed by a **stage** `k = 1, 2, 3, �
 > 🧮 **What is "stage / time k"?** Time isn't a smooth flow here — the robot acts in a sequence of steps, like turns in a board game. `k` simply counts them: stage 1, stage 2, …. At each stage `k` the robot gets an observation `y_k ∈ Y` and applies an action `u_k ∈ U`.
 > (`y_k ∈ Y` reads *"y_k is an element of Y"* — i.e. `y_k` is one particular reading out of all the possible ones in `Y`.)
 
-**Maximal information space** — the richest possible bookkeeping: keep *everything* the robot could know. Everything else we do is *deliberately throwing some of it away* to get something smaller and usable. **⟵ reconcile w/ slides**
+**Maximal information space** — the richest possible bookkeeping: keep *everything* the robot could know. Everything else we do is *deliberately throwing some of it away* to get something smaller and usable. ✅ *(Slides confirm: the full history `η_k` is "the maximal information the robot can get about the physical world.")*
 
 ---
 
@@ -144,6 +144,12 @@ The actual formulas (kept out of the table so the `|` bars read cleanly):
 
 ---
 
+> 📊 **From the slides (extra formal bits):**
+> - **History order:** `η_k = (y₁, u₁, y₂, u₂, …, u_{k-1}, y_k)` — the **maximal information** about the world.
+> - **Two disturbances:** `ψ` perturbs the **sensor**, `θ` perturbs the **world** → `h : X×Ψ → Y` (≡ `h : X → pow(Y)`) and `f : X×U×Θ → X` (≡ `f : X×U → pow(X)`). With sensor disturbance the **preimage** generalises to `h⁻¹(y) = { x ∈ X | y ∈ h(x) }`.
+> - **Derived I-spaces:** an **information mapping `κ`** sends `I_hist → I_der`. Estimating the physical state (a world model) is *one* choice of `κ` — **not the only one**.
+> - **Refs:** LaValle (2006) *Planning Algorithms*, Ch. 11; LaValle (2012) *Sensing and Filtering: A Fresh Perspective Based on Preimages and Information Spaces.*
+
 ## Connections
 - Source text: `readings/reading-04` (LaValle Ch. 11). The grid example is the **discrete** case (`gridbots`).
 - `tray-tilting` = the **predict** step with *no sensing*. `sensor-lattices` = ordering sensors by how finely their preimages **partition** `X`. `filters-plans-and-reduction-algorithms` (Wed) = computing & compressing I-states.
@@ -165,9 +171,9 @@ The actual formulas (kept out of the table so the `|` bars read cleanly):
 - Nondeterministic / possibilistic I-space = subsets of `X`; `U` actions; `f : X×U`; states evolve; disturbance / imperfect world; probabilistic I-space.
 
 ## 📎 Slides
-_Drop the lecture slides in [`../slides/`](../slides/) (e.g. `information-spaces.pdf`) and tell me — I'll **reconcile** these notes against them, especially the items flagged **⟵ reconcile w/ slides**._
+Reconciled against **`reading_material/lecture_slides/Lecture 2_ information_spaces.pdf`** (40 pp).
 
 ## ❓ Open questions
-- Exact definition of **"maximal information space"** as used in the lecture.
-- Were the formal **predict/correct equations** given, or just the intuition?
-- In the continuous case, exactly how was "red" defined as a subset of `[0,4]`?
+- ✅ *"Maximal information space"* = the full history `η_k` (slides confirm).
+- ✅ Formal **predict/correct** equations were given: `ι₁ = X₀ ∩ h⁻¹(y₁)`; `F(X₁,u₁) = {x = f(x₁,u₁) : x₁ ∈ X₁}`; `ι₂ = F(X₁,u₁) ∩ h⁻¹(y₂)`.
+- Continuous-grid "red" as a subinterval of `[0,4]` was my extrapolation — not explicitly in the deck.
