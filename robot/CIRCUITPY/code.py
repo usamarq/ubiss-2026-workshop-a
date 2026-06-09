@@ -4,6 +4,8 @@ import asyncio
 import analogio
 
 from motor import StepperMotor
+import telemetry
+from telemetry import log
 
 # ---- motors (differential drive) ----
 motor1 = StepperMotor(board.GP15, board.GP16, board.GP17, board.GP18, rpm=8)
@@ -89,7 +91,7 @@ async def wait_for_motors(*motors):
 async def seek_light():
     # Rotate one full turn, remember the heading with the most light,
     # then turn back to face it ("lock on").
-    print("SEEK: rotating to find the light...")
+    log("SEEK: rotating to find the light...")
     best = -1
     best1, best2 = motor1.position, motor2.position
     done = 0
@@ -105,7 +107,7 @@ async def seek_light():
     motor1.move_to(best1)
     motor2.move_to(best2)
     await wait_for_motors(motor1, motor2)
-    print("SEEK: locked on (level", best, ")")
+    log("SEEK: locked on (level", best, ")")
 
 
 async def light_follow():
@@ -114,16 +116,17 @@ async def light_follow():
     while True:
         l, r = await read_lr()
         if (l + r) < LOST_LEVEL:
+            log("LOST: L", l, "R", r, "(sum <", LOST_LEVEL, ") -> re-seek")
             await seek_light()          # lost it -> seek again
             continue
         diff = l - r
         if abs(diff) > DEADBAND:
             toward_left = diff > 0
             spin(STEER_SIGN * (TURN_STEP if toward_left else -TURN_STEP))
-            print("L:", l, " R:", r, " -> turn", "LEFT" if toward_left else "RIGHT")
+            log("L:", l, " R:", r, " -> turn", "LEFT" if toward_left else "RIGHT")
             await wait_for_motors(motor1, motor2)
         else:
-            print("L:", l, " R:", r, " -> straight")
+            log("L:", l, " R:", r, " -> straight")
         drive_forward(FWD_STEP)
         await wait_for_motors(motor1, motor2)
 
@@ -131,6 +134,8 @@ async def light_follow():
 async def main():
     asyncio.create_task(motor1.run())
     asyncio.create_task(motor2.run())
+    if telemetry.start():
+        asyncio.create_task(telemetry.serve())
     await light_follow()
 
 
