@@ -2,7 +2,7 @@
 
 > **Workshop A — Minimalism in Robotics** · UBISS 2026
 > Goal: a *unique, minimal* docking approach using the resources & sensors we have.
-> Status: 🟢 brief + sensor inventory in hand (Jun 9) — analysis drafted
+> Status: 🟢 brief **confirmed against the clean doc** + sensor inventory in hand (Jun 9) — analysis drafted
 
 ## The brief (from the activity doc)
 **You need to:**
@@ -17,8 +17,10 @@
 - **+1** — not covering at termination, but covered *some* part at *some* point during the run.
 - **−5** — indicator displayed **while the robot was moving**. ⚠️
 
-**Round 1:** *no constraints on modifying the environment or robot*; we provide six starting locations.
-**Meta:** instructors floated **"pricing" resources** (raising prices once a solution is found) → fewer/cheaper resources is rewarded. **Prizes:** most creative / minimal / maximal / most robust / most adaptable / best failure.
+**Round 1 (⚠️ from the earlier draft view — NOT shown in the current clean doc; confirm it's still in effect):** *no constraints on modifying the environment or robot*; we provide six starting locations.
+**Meta (also earlier-draft — confirm):** instructors floated **"pricing" resources** (raising prices once a solution is found) → fewer/cheaper resources is rewarded. **Prizes:** most creative / minimal / maximal / most robust / most adaptable / best failure.
+
+> 🔑 **Dependency for the recommended approach:** the **docking station itself (funnel + mat) is ours to design** per the core brief ("design a docking station that includes a target mat"). But mounting a **magnet / photodiodes on the robot** counts as *robot* modification — licensed by the Round-1 note above, which is unconfirmed. **If robot mods are disallowed**, keep the funnel (station-side) but drop the on-robot magnet and lean on sensor-only homing (alt. B/C).
 
 ## Available resources & sensors (confirmed)
 `photodiode` · `colour sensor (gesture)` · `IMU` · `camera` · `ultrasonic` · `colored tape` · `magnets + hall-effect sensors` · `speaker + microphones`
