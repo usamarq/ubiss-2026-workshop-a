@@ -27,14 +27,18 @@ USE_FLICKER = True           # True = home on the BLINKING light only; steady ro
 BEACON_HZ   = 2.0            # strobe app blink rate ("twice in a second" = 2.0)
 SMOOTH_MS   = 10             # per-sample averaging window; >=10 ms cancels mains (100 Hz) flicker
 
-DEADBAND  = 800 if USE_FLICKER else 1500   # |L-R| under this = drive straight (wobble units when flicker)
+DEADBAND_FRAC = 0.20         # turn only if |L-R| exceeds this fraction of the mean signal
+                             # (relative, so it works at any distance/brightness)
 TURN_STEP = 80               # steps per steering pivot
 FWD_STEP  = 200              # steps per forward advance
 
 # 360 light-seek
 SPIN_STEP       = 360        # steps per scan step (~11 deg; smaller = finer but slower scan)
 FULL_TURN_STEPS = 12000      # steps for ONE full 360 in-place turn (CALIBRATE - see notes)
-LOST_LEVEL      = 800 if USE_FLICKER else 1500   # if L+R drops below this, seek again
+LOST_LEVEL      = 500 if USE_FLICKER else 1500   # a look with L+R below this is "weak"
+MISS_LIMIT      = 3          # re-seek only after this many consecutive weak looks
+                             # (single weak looks happen when a look lands in the
+                             #  strobe's pause - don't restart the whole scan for one)
 # ====================================================
 
 
@@ -113,14 +117,20 @@ async def seek_light():
 async def light_follow():
     # 1) spin 360 to find & lock onto the light, then 2) follow it.
     await seek_light()
+    misses = 0
     while True:
         l, r = await read_lr()
         if (l + r) < LOST_LEVEL:
-            log("LOST: L", l, "R", r, "(sum <", LOST_LEVEL, ") -> re-seek")
-            await seek_light()          # lost it -> seek again
-            continue
+            misses += 1
+            log("weak look", misses, "of", MISS_LIMIT, "- L:", l, " R:", r)
+            if misses >= MISS_LIMIT:
+                log("LOST -> re-seek")
+                await seek_light()
+                misses = 0
+            continue                    # hold position, just look again
+        misses = 0
         diff = l - r
-        if abs(diff) > DEADBAND:
+        if abs(diff) > DEADBAND_FRAC * (l + r) / 2:
             toward_left = diff > 0
             spin(STEER_SIGN * (TURN_STEP if toward_left else -TURN_STEP))
             log("L:", l, " R:", r, " -> turn", "LEFT" if toward_left else "RIGHT")
