@@ -57,8 +57,10 @@ FWD_NEAR   = 400             # ~2 cm per advance when near
 # 360 light-seek
 SPIN_STEP       = 360        # steps per scan step (~11 deg; smaller = finer but slower scan)
 FULL_TURN_STEPS = 12000      # steps for ONE full 360 in-place turn (CALIBRATE - see notes)
-SEEK_EXIT_LEVEL = 6000       # during the scan, a heading at least this strong = the beacon:
-                             # stop scanning and start driving (skip the rest of the circle)
+SEEK_EXIT_LEVEL = 2400       # during the scan, a heading at least this strong = the beacon:
+                             # stop scanning and start driving (skip the rest of the circle).
+                             # (Telemetry: facing the beacon from the start line reads ~3050;
+                             #  6000 never fired and cost a full circle + swing-back.)
 LOST_LEVEL      = 500 if USE_FLICKER else 1500   # a look with L+R below this is "weak"
 MISS_LIMIT      = 3          # re-seek only after this many consecutive weak looks
                              # (single weak looks happen when a look lands in the
