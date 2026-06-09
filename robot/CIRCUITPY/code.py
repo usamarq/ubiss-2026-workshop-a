@@ -1,3 +1,4 @@
+import time
 import board
 import asyncio
 import analogio
@@ -5,8 +6,8 @@ import analogio
 from motor import StepperMotor
 
 # ---- motors (differential drive) ----
-motor1 = StepperMotor(board.GP15, board.GP16, board.GP17, board.GP18, rpm=8)
-motor2 = StepperMotor(board.GP19, board.GP20, board.GP21, board.GP22, rpm=8)
+motor1 = StepperMotor(board.GP15, board.GP16, board.GP17, board.GP18, rpm=12)
+motor2 = StepperMotor(board.GP19, board.GP20, board.GP21, board.GP22, rpm=12)
 
 # ---- light sensors (photodiodes) ----
 sensorL = analogio.AnalogIn(board.GP28)
@@ -17,20 +18,57 @@ FWD_M1, FWD_M2   = 1, -1     # forward = OPPOSITE signs (mirror-mounted motors)
 SPIN_M1, SPIN_M2 = 1, 1      # spin in place = SAME sign
 STEER_SIGN       = 1         # set -1 if it steers AWAY from the light
 BRIGHTER_IS_HIGHER = True    # set False if covering a sensor RAISES its number
-DEADBAND  = 1500             # |L-R| under this = drive straight
+                             # (only matters when USE_FLICKER = False)
+
+# -- blinking-beacon detection (phone strobe app) --
+USE_FLICKER = True           # True = home on the BLINKING light only; steady room light cancels
+BEACON_HZ   = 2.0            # strobe app blink rate ("twice in a second" = 2.0)
+SMOOTH_MS   = 10             # per-sample averaging window; >=10 ms cancels mains (100 Hz) flicker
+
+DEADBAND  = 800 if USE_FLICKER else 1500   # |L-R| under this = drive straight (wobble units when flicker)
 TURN_STEP = 80               # steps per steering pivot
 FWD_STEP  = 200              # steps per forward advance
 
 # 360 light-seek
 SPIN_STEP       = 120        # steps per scan step (smaller = finer scan)
 FULL_TURN_STEPS = 12000      # steps for ONE full 360 in-place turn (CALIBRATE - see notes)
-LOST_LEVEL      = 1500       # if L+R drops below this, seek again
+LOST_LEVEL      = 800 if USE_FLICKER else 1500   # if L+R drops below this, seek again
 # ====================================================
 
 
 def brightness(ai):
     v = ai.value
     return v if BRIGHTER_IS_HIGHER else (65535 - v)
+
+
+async def read_lr():
+    # One "look" with both sensors at once.
+    # USE_FLICKER mode: watch for ~1.2 blink periods and return how much each
+    # sensor WOBBLES (max - min). Steady room light doesn't wobble, so it
+    # cancels out -- only the blinking torch registers. Each sample is itself
+    # averaged over SMOOTH_MS, which erases the 100 Hz flicker of mains-powered
+    # room lights. (BRIGHTER_IS_HIGHER is irrelevant here: blinking wobbles
+    # the reading either way.)
+    if not USE_FLICKER:
+        return brightness(sensorL), brightness(sensorR)
+    min_l = min_r = 65535
+    max_l = max_r = 0
+    t_end = time.monotonic() + 1.2 / BEACON_HZ
+    while time.monotonic() < t_end:
+        sum_l = sum_r = n = 0
+        t_smooth = time.monotonic() + SMOOTH_MS / 1000
+        while time.monotonic() < t_smooth:
+            sum_l += sensorL.value
+            sum_r += sensorR.value
+            n += 1
+        l = sum_l // n
+        r = sum_r // n
+        if l < min_l: min_l = l
+        if l > max_l: max_l = l
+        if r < min_r: min_r = r
+        if r > max_r: max_r = r
+        await asyncio.sleep(0)
+    return max_l - min_l, max_r - min_r
 
 
 def drive_forward(steps):
@@ -59,7 +97,8 @@ async def seek_light():
         spin(SPIN_STEP)
         await wait_for_motors(motor1, motor2)
         done += SPIN_STEP
-        level = brightness(sensorL) + brightness(sensorR)
+        l, r = await read_lr()
+        level = l + r
         if level > best:
             best = level
             best1, best2 = motor1.position, motor2.position
@@ -73,8 +112,7 @@ async def light_follow():
     # 1) spin 360 to find & lock onto the light, then 2) follow it.
     await seek_light()
     while True:
-        l = brightness(sensorL)
-        r = brightness(sensorR)
+        l, r = await read_lr()
         if (l + r) < LOST_LEVEL:
             await seek_light()          # lost it -> seek again
             continue
