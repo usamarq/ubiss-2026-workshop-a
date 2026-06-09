@@ -2,7 +2,7 @@
 
 > **Workshop A — Minimalism in Robotics** · UBISS 2026
 > Day 2 · Tue Jun 9 · Activity · Fort TS128
-> Status: 🟡 basics pre-filled
+> Status: 🟡 activity done (Jun 9) — your notes pending
 
 ## TL;DR
 Tilt a tray in a **sequence of directions** and gravity slides a part into a **known orientation/position** — **with no sensors at all**. A classic, beautiful minimalism result: replace *sensing* with *mechanics*.
