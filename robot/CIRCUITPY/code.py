@@ -24,17 +24,27 @@ BRIGHTER_IS_HIGHER = True    # set False if covering a sensor RAISES its number
 
 # -- blinking-beacon detection (phone strobe app) --
 USE_FLICKER = True           # True = home on the BLINKING light only; steady room light cancels
-BEACON_HZ   = 2.0            # strobe app blink rate ("twice in a second" = 2.0)
+BEACON_HZ   = 9.3            # strobe blink rate, MEASURED with beacon_meter.py (9.28 Hz, 56% duty)
+                             # -> each "look" now takes only ~0.13 s
 SMOOTH_MS   = 10             # per-sample averaging window; >=10 ms cancels mains (100 Hz) flicker
 
 DEADBAND_FRAC = 0.20         # turn only if |L-R| exceeds this fraction of the mean signal
                              # (relative, so it works at any distance/brightness)
-TURN_STEP = 80               # steps per steering pivot
-FWD_STEP  = 200              # steps per forward advance
+# steering: turn size scales with how off-centre the light is (proportional)
+TURN_GAIN = 900              # turn steps = TURN_GAIN * |L-R| / (L+R), clamped:
+TURN_MIN  = 60               #   barely off-centre -> small trim
+TURN_MAX  = 500              #   strongly off-centre -> one big correction (~15 deg)
+
+# stride: cover ground when far, fine-tune when near (levels from live telemetry)
+NEAR_LEVEL = 20000           # L+R above this = close to the beacon
+FWD_FAR    = 1200            # ~6 cm per advance when far
+FWD_NEAR   = 400             # ~2 cm per advance when near
 
 # 360 light-seek
 SPIN_STEP       = 360        # steps per scan step (~11 deg; smaller = finer but slower scan)
 FULL_TURN_STEPS = 12000      # steps for ONE full 360 in-place turn (CALIBRATE - see notes)
+SEEK_EXIT_LEVEL = 6000       # during the scan, a heading at least this strong = the beacon:
+                             # stop scanning and start driving (skip the rest of the circle)
 LOST_LEVEL      = 500 if USE_FLICKER else 1500   # a look with L+R below this is "weak"
 MISS_LIMIT      = 3          # re-seek only after this many consecutive weak looks
                              # (single weak looks happen when a look lands in the
@@ -105,6 +115,9 @@ async def seek_light():
         done += SPIN_STEP
         l, r = await read_lr()
         level = l + r
+        if level >= SEEK_EXIT_LEVEL:
+            log("SEEK: strong signal (", level, ") - early lock, driving now")
+            return
         if level > best:
             best = level
             best1, best2 = motor1.position, motor2.position
@@ -132,12 +145,14 @@ async def light_follow():
         diff = l - r
         if abs(diff) > DEADBAND_FRAC * (l + r) / 2:
             toward_left = diff > 0
-            spin(STEER_SIGN * (TURN_STEP if toward_left else -TURN_STEP))
-            log("L:", l, " R:", r, " -> turn", "LEFT" if toward_left else "RIGHT")
+            turn = min(TURN_MAX, max(TURN_MIN, int(TURN_GAIN * abs(diff) / (l + r))))
+            spin(STEER_SIGN * (turn if toward_left else -turn))
+            log("L:", l, " R:", r, " -> turn", "LEFT" if toward_left else "RIGHT", turn)
             await wait_for_motors(motor1, motor2)
         else:
             log("L:", l, " R:", r, " -> straight")
-        drive_forward(FWD_STEP)
+        steps = FWD_NEAR if (l + r) > NEAR_LEVEL else FWD_FAR
+        drive_forward(steps)
         await wait_for_motors(motor1, motor2)
 
 
