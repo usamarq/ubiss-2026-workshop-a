@@ -2,9 +2,7 @@
 
 > **Workshop A — Minimalism in Robotics** · UBISS 2026
 > Day 2 · Tue Jun 9 · Lecture · Fort TS128
-> Status: 🟢 in-class notes added (Jun 9) · **official slides pending** → items marked **⟵ reconcile w/ slides**
->
-> 🧮 = beginner math explainer. (This is a research area of the instructors — esp. **Dylan Shell** — so expect the formal version.)
+> Status: 🟢 **reconciled with the Sensors lecture slides** (Jun 9) · 🧮 = beginner math explainer. (A research area of the instructors — esp. **Dylan Shell**.)
 
 ## TL;DR
 A precise way to compare sensors (and therefore robots) by **how much they can tell apart**. Sensors sit in a "**more-informative-than**" ordering (the **dominance** partial order); that ordering turns out to be a **lattice**, which is what lets you hunt for the *minimal* sensor that still does a job.
@@ -61,7 +59,7 @@ Recall from `day2-information-spaces`: a sensor's readings **partition** the sta
 - **Top `⊤`** = the **perfect sensor** (every state in its own group → knows the exact state).
 - **Bottom `⊥`** = the **null sensor** (one big group → tells you nothing).
 - **Join two sensors** = *use both at once* (you can distinguish states if **either** sensor can) → moves **up** the lattice (more info).
-- **Meet two sensors** = the information they **share** (only what both agree on) → moves **down**.  **⟵ reconcile w/ slides** (exact meet/join definitions & which way "up" points can flip between conventions).
+- **Meet two sensors** = the information they **share** (only what both agree on) → moves **down**. ✅ *(Slides confirm the orientation: more-informative = finer = **higher**; in the distance-sensor lattice the full 360° scan is at the top, the null sensor at the bottom. Exact meet/join formulas for arbitrary sensors weren't given — just that the lattice exists.)*
 
 > 🧮 **Concrete picture (using the grid-world colours):**
 > ```
@@ -87,10 +85,44 @@ The order on sensors has a name: **dominance**.
 
 ---
 
+## 4b · Dominance = simulability (the slide's key result) ✅
+If `h_a` dominates `h_b`, you can **simulate `h_b` using `h_a` plus a relabelling function** `g : Y_a → Y_b`:
+> `h_b = g ∘ h_a` — take `h_a`'s reading and post-process it.
+
+(Equivalently: if `Π_a` refines `Π_b`, you can *coarsen* `Π_a` to get `Π_b`.) So *"a is at least as good as b"* literally means *"a can stand in for b."*
+
+> ⚠️ This **ignores the cost** of computing `g` — which is exactly the sensing ⇄ computation trade-off in `day4-information-invariants`.
+
 ## 5 · Comparing robots & the minimalism payoff
 - **Compare two robots** by where their sensors sit in this lattice: a robot with a **dominating** sensor is *at least as capable* (information-wise). If they're **incomparable**, neither is strictly "better" — each knows things the other can't.
 - **Minimalism = go as low as you can.** For a given task, find the **least informative sensor that still solves it** — the lowest point in the lattice that's still "good enough." That's a precise version of "how little sensing is enough?" and gives the **metrics** the workshop wants (objective #1).
+- 💡 **"a minimal" vs "the minimal":** because dominance is a *partial* (not total) order, there can be **several incomparable minimal robots** — you find *a* minimal robot, not necessarily *the* minimal one.
 - Directly useful for our **docking project**: it's the formal way to argue our two light sensors are *sufficient* (and that fancier sensors would be needlessly high in the lattice).
+
+## From the slides (the Sensors lecture) 📊
+**Why compare at all?** To know whether two pieces of hardware are **interchangeable** — from the *information* viewpoint, can one device's signal be transformed into another's? A lattice gives a **global view** of those interrelationships.
+
+### Worked example — three distance sensors (LaValle 2019)
+- **'All 360°'** — distance in every direction (a full scan).
+- **'Nearest Obstacle'** — only the distance to the closest obstacle (the min over all directions).
+- **'Distance Ahead'** — only the forward distance.
+
+You can compute the latter two *from* the 360° scan, so it **dominates** both; *Nearest-Obstacle* and *Distance-Ahead* are **incomparable**. The lattice:
+```
+            h_360°           ← most informative (top)
+           /      \
+   h_NearestObs   h_Ahead    ← incomparable
+           \      /
+            h_∅              ← null sensor (bottom)
+```
+
+### Three generalizations (briefly shown)
+- **Noisy sensors** → readings aren't deterministic, so the basic objects are **covers, not partitions** → you get a **semilattice** (Zhang & Shell 2021). And sometimes **less discriminating power is *desirable*** (e.g. privacy guarantees)!
+- **General capabilities via *primitives*** → you can simulate a sensor with **actions**: a robot with only odometers that *drives until it bumps a wall, turns 180°, and returns* recovers what a distance sensor would have told it (O'Kane 2007). → sensing ⇄ motion trade-off.
+- **Lattices of plans / action-based sensors** — plans (which use *memory*) and action-based sensors (*stateless*) both encode the information a task needs (McFassel & Shell 2022).
+
+### Key references
+LaValle 2019 (*Sensor Lattices*) · O'Kane 2007 (PhD, *A theory for comparing robot systems*) · O'Kane & LaValle 2008 (*On Comparing the Power of Robots*, IJRR) · Zhang & Shell 2021 · McFassel & Shell 2022.
 
 ## Connections
 - Built on **preimages / partitions** from `day2-information-spaces`.
@@ -101,6 +133,8 @@ The order on sensors has a name: **dominance**.
 - Define **upper / lower bound** and **LUB (join) / GLB (meet)**; define a **lattice**; give the **power-set (set-inclusion) lattice** (join = `∪`, meet = `∩`, top = `S`, bottom = `∅`).
 - Explain the **dominance** order on sensors (A dominates B = A's partition refines B's = A at least as informative); name the top (perfect) and bottom (null).
 - Use it to **compare two robots** / pick a **minimal sufficient** sensor.
+- State **dominance ⇔ simulability**: `h_a ⪰ h_b` iff `h_b = g ∘ h_a` for some relabelling `g`.
+- Why there's *a* minimal robot, not *the* minimal robot (a partial, not total, order).
 
 ## 📝 In-class notes (raw — Jun 9)
 - Intro to **partial order**, **lattices**, **sensor lattices**, **dominance partial order**, etc.
@@ -108,9 +142,9 @@ The order on sensors has a name: **dominance**.
 - _(add: any specific definitions, diagrams, or examples the instructor used — and the formal meet/join for sensors)_
 
 ## 📎 Slides
-_Drop the deck in [`../slides/`](../slides/) (e.g. `sensor-lattices.pdf`) and I'll reconcile — especially the exact meet/join definitions and order orientation (flagged ⟵ reconcile w/ slides)._
+Reconciled against **`reading_material/lecture_slides/Lecture_ Sensors.pdf`** ("On Sensor Lattices and Comparing Robots").
 
 ## ❓ Open questions
-- Exact **meet/join** of two sensors as defined in the lecture (and is "more informative" drawn at the top or the bottom?).
-- Did they cover **how to compute** the lattice / minimal sensor, or just the concepts?
-- Any **named results** (e.g. about the size/complexity of the sensor lattice)?
+- ✅ Orientation resolved: more-informative = **top** (distance-sensor lattice: 360° on top, ∅ at bottom).
+- ✅ Dominance characterised via **simulation** `h_b = g ∘ h_a`.
+- Exact **meet/join formulas** for two arbitrary sensors weren't given explicitly — only that the lattice exists.
