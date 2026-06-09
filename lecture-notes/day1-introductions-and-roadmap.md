@@ -2,7 +2,7 @@
 
 > **Workshop A — Minimalism in Robotics** · UBISS 2026
 > Day 1 · Mon Jun 8 · Lecture · Fort TS128
-> Status: 🟡 basics pre-filled — _add in-class notes_
+> Status: 🟢 in-class notes added (Jun 8) — orientation + toolchain day
 
 ## TL;DR
 The framing lecture: what "minimalism in robotics" means, why it matters, and how the week is organized.
@@ -28,9 +28,11 @@ This is the thesis statement for everything else — every later topic is an ins
 - State the central question and the **four resource dimensions**.
 - Give the **two motivations** for building simpler robots.
 
-## 📝 In-class notes (fill after lecture)
-- _Roadmap of the week / the "tracks" mentioned:_
-- _Any definitions or framing the instructors emphasized:_
+## 📝 In-class notes (Mon Jun 8)
+- Mostly **introductions & orientation** — people, organization, and the roadmap for the week.
+- **Hands-on toolchain / free play:** got comfortable with the **robot + Thonny + CircuitPython** — editing `code.py` on the `CIRCUITPY` drive and running it. This was the day's main practical takeaway.
+- Also on Monday's schedule (add specifics to their own notes when you recall): the **gridbots** live-coding demo → `day1-gridbots`; the **Braitenberg** hands-on activity → `day1-braitenberg-vehicles`.
+- _Anything the instructors specifically emphasized in the intro:_ ⟵ fill if needed
 
 ## ❓ Open questions
 -
