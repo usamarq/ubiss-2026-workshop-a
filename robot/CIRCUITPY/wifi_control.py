@@ -15,7 +15,7 @@ HOW TO RUN
     the same motor pins.)
 
 2. Watch the serial output. It prints the network name and the address, e.g.
-       Connect your PC to WiFi:  UBISS-Robot   (password: CHANGE_ME)
+       Connect your PC to WiFi:  UBISS-Robot   (password: see settings.toml)
        Then open a browser to:   http://192.168.4.1
 
 3. On your PC: join that WiFi network, open the address in a browser, then
@@ -41,7 +41,7 @@ from motor import StepperMotor
 
 # ---- WiFi access-point settings (override in settings.toml if you like) ----
 AP_SSID = os.getenv("AP_SSID") or "UBISS-Robot"
-AP_PASSWORD = os.getenv("AP_PASSWORD") or "CHANGE_ME"   # must be 8-63 chars
+AP_PASSWORD = os.getenv("AP_PASSWORD") or "CHANGE_ME"   # 8-63 chars; set the real value in settings.toml
 
 # ---- Motor setup (same pins as code.py) ----
 SPEED_RPM = 8        # 28BYJ-48 steppers run reliably up to ~10-12 rpm

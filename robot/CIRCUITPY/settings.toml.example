@@ -1,0 +1,5 @@
+# Robot Wi-Fi access-point config for the Pico 2 W.
+# Copy this file to "settings.toml" (which is gitignored) and set the real values.
+# CircuitPython reads these at boot via os.getenv(); wifi_control.py uses them.
+AP_SSID = "UBISS-Robot"
+AP_PASSWORD = "your-ap-password-here"   # 8-63 characters

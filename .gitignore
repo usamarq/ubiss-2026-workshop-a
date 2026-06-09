@@ -12,3 +12,6 @@ venv/
 # Editors
 .idea/
 *.swp
+
+# CircuitPython robot config — may hold the Wi-Fi AP password; keep local only
+robot/CIRCUITPY/settings.toml
