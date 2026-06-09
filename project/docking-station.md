@@ -24,7 +24,7 @@
 
 ## Available resources & sensors (confirmed)
 `photodiode` · `colour sensor (gesture)` · `IMU` · `camera` · `ultrasonic` · `colored tape` · `magnets + hall-effect sensors` · `speaker + microphones`
-_(Assumed: a differential-drive wheeled gridbot with a flat base — **confirm actuators / base size**.)_
+_(**Confirmed from the robot, Jun 9:** Raspberry Pi **Pico 2 W** / CircuitPython 10.2.1; **two stepper motors** → differential drive, 4096 steps/rev = **dead-reckoning odometry for free**; **two analog L/R light sensors** on GP26 / GP28 → Braitenberg-ready. Full hardware notes: [`../robot/notes.md`](../robot/notes.md). Still confirm base shape/size + whether we may mount a magnet.)_
 
 ## Strategy — where the points actually are
 - 🎯 **Make the target the MINIMUM size, 1×1 cm.** *You* design the mat. A tiny target is trivial to obscure 100% with the robot's base → maximizes the +10; a 9×9 cm target would demand near-perfect alignment. Do the **homing with a larger structure** that funnels down to the tiny target.
@@ -58,7 +58,7 @@ Ambient room light (ceiling panels, windows/sun, other teams) **will** affect a 
 - **Cross-round robustness:** keep **photodiode beacon-homing** as the orientation-independent core; if later rounds forbid modifying env/robot, degrade gracefully to B (tape) or C (camera).
 
 ## Open questions / to confirm
-- Robot **actuators** (differential drive?) + **base shape/size**, and whether we may mount a magnet + photodiodes.
+- ✅ Robot **actuators confirmed** (2 steppers, differential drive, dead-reckoning) + photodiode L/R already wired. Still confirm **base shape/size** + whether we may mount a magnet (robot modification).
 - Are **active dock emitters** (LED / audio beacon) allowed, or only *passive* marks? (Decides the coarse-homing method.)
 - **Round 2+ constraints** — the brief image cut off after "Round 1"; how much modification gets restricted later?
 - The "**six starting locations**" we must provide — choose ones that showcase orientation-independence.
