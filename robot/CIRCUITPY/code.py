@@ -61,7 +61,8 @@ MISS_LIMIT      = 3          # re-seek only after this many consecutive weak loo
                              #  strobe's pause - don't restart the whole scan for one)
 
 # docking (hall sensor GP27, indicator LED GP8)
-DOCKING_ENABLED = True       # False = pure light-follow test (hall/LED ignored)
+DOCKING_ENABLED = False      # False = pure light-follow test (hall/LED ignored)
+                             # -> flip to True once the magnet + hall are mounted
 MAGNET_DETECTED = True       # hall.value when the magnet is present
                              # (team-measured; if docking misfires, verify with hall_test.py)
 SETTLE_TIME     = 0.5        # seconds fully stopped before the indicator turns on
