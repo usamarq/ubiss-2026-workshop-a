@@ -25,9 +25,13 @@ Team project = two scored tasks built on a small robot:
   forward = OPPOSITE signs (`1, -1`), spin-in-place = SAME signs.
 - **rpm 8 = safe. 12 = stalls** (silently: driver LEDs blink, shaft doesn't move). 10 untested.
 - **Light sensors (photodiodes):** `sensorL` = GP28, `sensorR` = GP26 (analog).
-- **Hall sensor:** GP27 (pull-up). `MAGNET_DETECTED = True` was team-measured but the
-  sensor only triggered at near-contact — suspect wrong magnet pole or weak magnet.
-  **No magnet available yet.** Verify polarity with `hall_test.py` before trusting.
+- **Hall sensor:** GP27 (pull-up) — **VERIFIED 2026-06-10** with neodymium magnet via
+  `hall_watch.py`: idles LOW, reads HIGH while magnet present (`MAGNET_DETECTED = True`
+  correct), 4/4 clean detect/release cycles, no bounce. **Unipolar: only ONE magnet face
+  triggers** — mark the working face; it must point at the robot's sensor in the dock.
+  GP10 has nothing on it (old hall_test.py comment was stale, since fixed).
+  ⚠️ Unplugged hall floats HIGH = false "docked"; boot self-check only catches boot-time —
+  keep the connector seated.
 - **Indicator LED:** GP8 (existence on the physical robot unconfirmed).
 - **Dead reckoning:** stepper step counts = free odometry (positions in `motor.position`).
 
@@ -43,8 +47,8 @@ Team project = two scored tasks built on a small robot:
   - `TURN_GAIN = 1400`, `TURN_MIN/MAX = 60/500` (proportional steering)
   - `DEADBAND_FRAC = 0.20` (relative deadband), `LOST_LEVEL = 500`, `MISS_LIMIT = 3` (3-strike)
   - `SPIN_STEP = 360`, `FULL_TURN_STEPS = 12000` (calibrated full robot turn)
-  - **`DOCKING_ENABLED = False`** ← flip to True once magnet + hall verified
-  - `MAGNET_DETECTED = True` (verify!), `SETTLE_TIME = 0.5`
+  - **`DOCKING_ENABLED = True`** (since 2026-06-10: magnet + hall verified)
+  - `MAGNET_DETECTED = True` (VERIFIED — idle False, True while magnet present), `SETTLE_TIME = 0.5`
 - **`motor.py`** — StepperMotor. ⚠️ Contains a critical fix: the idle branch re-pins
   `next_step` to now; without it, any pause (sensor reads) causes a catch-up step
   burst that silently stalls the motor. **Never revert this.**
@@ -102,9 +106,11 @@ Team project = two scored tasks built on a small robot:
 - Homing tested end-to-end: seek → early-lock → approach → reaches the phone. Fast.
 - The docking state machine is already in code.py (hall watched during moves → stop →
   0.5 s settle → re-verify → LED → hold; boot self-check vs miswired hall).
-- **TODO:** get magnet (try flipping pole if range is bad; ask for neodymium) → run
-  `hall_test.py` → set `MAGNET_DETECTED` → confirm LED on GP8 → flip
-  `DOCKING_ENABLED = True` → build funnel + 1×1 cm target → full rehearsal.
+- ~~get magnet~~ ✓ ~~verify hall~~ ✓ (GP27, MAGNET_DETECTED=True, one pole — see
+  hardware truth) ~~flip DOCKING_ENABLED~~ ✓ deployed 2026-06-10.
+- **TODO:** full-routine test (beacon at 9.28 Hz preset + magnet working-face-up at its
+  base) → confirm LED on GP8 physically exists → measure hall trigger range for the
+  funnel throat → build funnel + 1×1 cm target → full rehearsal from 3 starts.
   Scored: +10 full target coverage, −5 if indicator shown while moving (the settle
   logic guards this — don't weaken it). Run lasts ≥3 min: dock and HOLD.
 ### Environment mapping (Task 2) — scaffold written, blocked on contact sensor + shape exam
@@ -150,3 +156,10 @@ Team project = two scored tasks built on a small robot:
   Thonny must NOT hold the port) + `robot/tools/payload_hall_watch.py` (watches GP10+GP27,
   prints transitions; also Thonny-runnable, DURATION defaults 60 s). User testing via
   Thonny. code.py NOT yet changed — awaiting magnet-watch verdict.
+- **2026-06-10 (robot thread, hall verified):** user's Thonny hall_watch run settled it:
+  **GP27 is the hall** (8 transitions, 4 clean magnet cycles, idle 0 → 1 on magnet,
+  held solid, no bounce); **GP10 dead** (0 transitions). First ~29 s silent = first
+  magnet face is the non-triggering pole (unipolar). Actions: `DOCKING_ENABLED = True`
+  + verified-evidence comments in code.py; hall_test.py rewritten (was stale GP10/
+  active-low); both deployed to board + cmp-verified; HANDOVER hardware truth updated.
+  Next: full-routine test with beacon + magnet, confirm GP8 LED, measure trigger range.

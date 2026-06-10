@@ -67,10 +67,15 @@ MISS_LIMIT      = 3          # re-seek only after this many consecutive weak loo
                              #  strobe's pause - don't restart the whole scan for one)
 
 # docking (hall sensor GP27, indicator LED GP8)
-DOCKING_ENABLED = False      # False = pure light-follow test (hall/LED ignored)
-                             # -> flip to True once the magnet + hall are mounted
-MAGNET_DETECTED = True       # hall.value when the magnet is present
-                             # (team-measured; if docking misfires, verify with hall_test.py)
+DOCKING_ENABLED = True       # hall VERIFIED with neodymium magnet (hall_watch
+                             # 2026-06-10: 4/4 clean detect/release cycles on GP27;
+                             # GP10 dead - hall_test.py's old pin comment was stale)
+MAGNET_DETECTED = True       # hall.value while the magnet is present; idles False.
+                             # ONE pole only (unipolar) - mount the dock magnet
+                             # working-face toward the sensor. NOTE: an unplugged
+                             # hall floats HIGH = false "docked" (pull-up), and the
+                             # boot self-check only catches that at boot - keep the
+                             # hall connector seated.
 SETTLE_TIME     = 0.5        # seconds fully stopped before the indicator turns on
                              # (the -5 rule: NEVER signal while moving)
 # ====================================================
