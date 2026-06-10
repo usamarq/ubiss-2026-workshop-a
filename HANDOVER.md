@@ -51,6 +51,13 @@ Team project = two scored tasks built on a small robot:
 - **`telemetry.py`** — robot makes its own WiFi AP `UBISS-Robot`, serves a live log page
   at `http://192.168.4.1/` (auto-refresh 1 s). Use `from telemetry import log; log(...)`
   instead of print in robot code (it does both). Wired into code.py's main().
+- **`mapping_code.py`** — Task 2 scaffold (Plan A: contact bit + odometry turn bursts).
+  Full state machine (boustrophedon sweep → wall-vs-obstacle by pose → bug-style hug
+  lap → turn-burst classifier → LED/telemetry report, 5-min watchdog). Classifier
+  desktop-tested on synthetic laps (clean + noisy: all 4 correct). **Not runnable yet:**
+  `CONTACT_PIN = None` boot-guards until a bumper is wired; `STEPS_PER_CM`, `LANE_CM`,
+  `NOSE_CM` are TODO pending tape-measure + shape exam. Deploys by copying onto the
+  board AS code.py for mapping runs.
 - **`beacon_meter.py`** — run in Thonny: measures real strobe Hz/duty via the photodiodes.
 - **`hall_test.py`, `motor_test.py`, `probe.py`** — team test scripts (motor_test = bare
   motion check, used to isolate power vs code issues).
@@ -100,17 +107,20 @@ Team project = two scored tasks built on a small robot:
   `DOCKING_ENABLED = True` → build funnel + 1×1 cm target → full rehearsal.
   Scored: +10 full target coverage, −5 if indicator shown while moving (the settle
   logic guards this — don't weaken it). Run lasts ≥3 min: dock and HOLD.
-### Environment mapping (Task 2) — analysis done, code not started
-- Read `project/environment-mapping.md` first. Recommended Plan A: bumper (or IMU spike)
-  contact + odometry; find obstacle (it's a contact at a pose where no wall should be —
-  start corner is known, arena 120×120); hug one lap (optionally drop the magnet at first
-  contact, hall ping = loop closed); classify by **turn distribution** (3 bursts =
-  triangle, continuous = disk); report via LED + telemetry at ≤5 min.
-- **Blocked on:** examining the physical shapes (height/color/size may yield a cheaper
-  discriminator), choosing contact sensor (microswitch vs IMU), instructor clarifications
-  (wall-touching obstacle? exterior mods? pushing legal?).
-- Suggested structure: keep code.py = docking; build `mapping_code.py` alongside, swap
-  whichever is needed onto the board as code.py for runs (or a MODE constant).
+### Environment mapping (Task 2) — scaffold written, blocked on contact sensor + shape exam
+- Read `project/environment-mapping.md` first. Plan A implemented as `mapping_code.py`
+  (see software state above): contact at a pose where no wall should be = obstacle;
+  hug one lap; classify by turn distribution (≥2 bursts of ≥45° = triangle, dribbles =
+  disk — classifier already passes synthetic-lap tests); report LED solid=disk /
+  blink=triangle + telemetry.
+- **Blocked on:** (1) a contact sensor — microswitch bumper preferred (stall is NOT
+  software-detectable; IMU would need a driver, none in lib/); wire it, set
+  `CONTACT_PIN`; (2) examining the physical shapes (sizes → `LANE_CM`; height/color may
+  yield a cheaper discriminator); (3) instructor clarifications (wall-touching obstacle?
+  exterior mods? pushing legal?). Magnet-drop loop closure is a noted option but
+  odometry closure is the scaffold default.
+- Deploy structure: code.py stays docking; copy mapping_code.py onto the board as
+  code.py for mapping runs.
 
 ## Known pitfalls (learned the hard way)
 1. Any motion code with pauses MUST keep the motor.py idle-resync fix.
@@ -124,3 +134,9 @@ Team project = two scored tasks built on a small robot:
 ## Handover log (append entries here)
 - **2026-06-10 (notes thread):** file created. Homing calibrated & working; docking awaits
   magnet; mapping analyzed, no code yet. Repo clean & pushed at this commit.
+- **2026-06-10 (robot thread):** session start. Pulled (already up to date), repo verified
+  against this file — all code.py tunables match, settings.toml untracked, identity correct.
+  Board NOT mounted, so no deploy/board-sync this session. Added `mapping_code.py` scaffold
+  (Plan A); classifier desktop-tested (4/4 synthetic laps). Docking unchanged, still awaiting
+  magnet + hall_test. Note: `docking_code.py` (tracked) is the earlier standalone
+  Thonny-runnable variant, superseded by code.py — kept as a fallback.
