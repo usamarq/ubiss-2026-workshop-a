@@ -1,0 +1,126 @@
+# HANDOVER — robot/code thread ↔ notes/planning thread
+
+> Read this fully before touching anything. You (the agent reading this) are the
+> **hands-on thread**: CircuitPython code, the docking + mapping tasks, deploying
+> to the robot, and syncing this repo. A separate Claude Code thread owns
+> lecture notes, exam prep, and planning. **Keep this file updated** as state
+> changes — it is the contract between threads.
+
+## Context
+UBISS 2026 Workshop A ("Minimalism in Robotics"), University of Oulu, June 8–13.
+Team project = two scored tasks built on a small robot:
+1. **Docking** — see [`project/docking-station.md`](project/docking-station.md) (brief, scoring, the "beacon-homed magnetic funnel" design).
+2. **Environment mapping** (disk vs triangle classification) — see [`project/environment-mapping.md`](project/environment-mapping.md) (analysis, Plan A tactile + Plan B ultrasonic).
+
+## Paths
+- **Repo (this folder):** `/Users/usamaraheel/Desktop/UBISS 2026 workshop A reading package and pre summer school assignments/ubiss-2026-workshop-a/`
+- **Robot mirror in repo:** `robot/CIRCUITPY/` ← the source of truth that gets committed
+- **Live robot drive:** `/Volumes/CIRCUITPY` (mounts when the Pico is plugged in via USB)
+- **Desktop venv (for syntax checks):** `../.venv/bin/python` (Python 3.14, relative to repo root)
+
+## Hardware truth (verified)
+- **Board:** Raspberry Pi Pico 2 W (RP2350A), CircuitPython 10.2.1, serial REPL `/dev/cu.usbmodem101`.
+- **Motors:** 2× 28BYJ-48-class steppers via custom `motor.py` (FULLSTEP, 4096 steps/rev).
+  `motor1` = GP15–18, `motor2` = GP19–22. Differential drive, **mirror-mounted**:
+  forward = OPPOSITE signs (`1, -1`), spin-in-place = SAME signs.
+- **rpm 8 = safe. 12 = stalls** (silently: driver LEDs blink, shaft doesn't move). 10 untested.
+- **Light sensors (photodiodes):** `sensorL` = GP28, `sensorR` = GP26 (analog).
+- **Hall sensor:** GP27 (pull-up). `MAGNET_DETECTED = True` was team-measured but the
+  sensor only triggered at near-contact — suspect wrong magnet pole or weak magnet.
+  **No magnet available yet.** Verify polarity with `hall_test.py` before trusting.
+- **Indicator LED:** GP8 (existence on the physical robot unconfirmed).
+- **Dead reckoning:** stepper step counts = free odometry (positions in `motor.position`).
+
+## Software state (all in `robot/CIRCUITPY/`, mirrored on the board)
+- **`code.py` = THE program** (auto-runs on boot). Complete pipeline:
+  flicker-beacon homing → (when enabled) docking endgame. Key tunables at top,
+  **each calibrated from live telemetry — don't regress them**:
+  - `BEACON_HZ = 9.3` — MEASURED strobe rate of the user's phone app (9.28 Hz, 56% duty).
+    If the app setting changes, re-measure with `beacon_meter.py`. The look window is
+    `1.2 / BEACON_HZ`; a mismatch (esp. BEACON_HZ > real rate) breaks detection.
+  - `SEEK_EXIT_LEVEL = 2400` (facing-beacon-at-1m reads ~3050; early-exits the 360° scan)
+  - `NEAR_LEVEL = 35000` (dock-adjacent sums ~50k; switches 6 cm strides → 2 cm)
+  - `TURN_GAIN = 1400`, `TURN_MIN/MAX = 60/500` (proportional steering)
+  - `DEADBAND_FRAC = 0.20` (relative deadband), `LOST_LEVEL = 500`, `MISS_LIMIT = 3` (3-strike)
+  - `SPIN_STEP = 360`, `FULL_TURN_STEPS = 12000` (calibrated full robot turn)
+  - **`DOCKING_ENABLED = False`** ← flip to True once magnet + hall verified
+  - `MAGNET_DETECTED = True` (verify!), `SETTLE_TIME = 0.5`
+- **`motor.py`** — StepperMotor. ⚠️ Contains a critical fix: the idle branch re-pins
+  `next_step` to now; without it, any pause (sensor reads) causes a catch-up step
+  burst that silently stalls the motor. **Never revert this.**
+- **`telemetry.py`** — robot makes its own WiFi AP `UBISS-Robot`, serves a live log page
+  at `http://192.168.4.1/` (auto-refresh 1 s). Use `from telemetry import log; log(...)`
+  instead of print in robot code (it does both). Wired into code.py's main().
+- **`beacon_meter.py`** — run in Thonny: measures real strobe Hz/duty via the photodiodes.
+- **`hall_test.py`, `motor_test.py`, `probe.py`** — team test scripts (motor_test = bare
+  motion check, used to isolate power vs code issues).
+- **`settings.toml`** — ON THE BOARD ONLY (gitignored): `AP_SSID`/`AP_PASSWORD` for the AP.
+  Template: `settings.toml.example`. **Never commit credentials** (repo is PUBLIC;
+  history was already scrubbed once — don't reintroduce).
+- **`wifi_control.py`** — repo-only (not on board): manual WiFi drive page. Sanitized.
+
+## Workflows
+- **Deploy:** edit in `robot/CIRCUITPY/`, syntax-check, copy, verify, commit, push:
+  ```bash
+  REPO=".../ubiss-2026-workshop-a"   # full path above
+  "$REPO/../.venv/bin/python" -c "import ast; ast.parse(open('$REPO/robot/CIRCUITPY/code.py').read())"
+  cp "$REPO/robot/CIRCUITPY/code.py" /Volumes/CIRCUITPY/code.py && sync
+  cmp -s "$REPO/robot/CIRCUITPY/code.py" /Volumes/CIRCUITPY/code.py && echo OK
+  ```
+  The board **auto-reloads and RUNS code.py on every file save** (motors may move!).
+  If `/Volumes/CIRCUITPY` isn't mounted, say so and wait — don't queue blind edits.
+- **Observe:** tethered = Thonny serial REPL (only one app may hold the port);
+  untethered = join WiFi `UBISS-Robot` (password is in the board's settings.toml,
+  the team default), open http://192.168.4.1/.
+- **Board → repo sync (new team files):** `rsync` from `/Volumes/CIRCUITPY/` into
+  `robot/CIRCUITPY/` **excluding `settings.toml`** and dotfiles, then scan new files
+  for secrets before committing.
+- **Calibration discipline:** thresholds come from telemetry/measurement, not guesses.
+  When you change one, note the evidence in a comment (existing comments show the style).
+
+## Git rules (IMPORTANT)
+- Remote: `https://github.com/usamarq/ubiss-2026-workshop-a.git`, branch `main`, **public repo**.
+- Identity is a **local override**: `Usama Raheel <usamarq@users.noreply.github.com>`
+  (personal account). The global gitconfig is the user's company identity — never use it
+  here, never edit global config.
+- **Do NOT add `Co-Authored-By: Claude` (or any Claude attribution) to commits.**
+- Commit style: short imperative subject, evidence in body when tuning ("from telemetry run N").
+- **Pull before you start each session** (`git pull --rebase`): the notes thread pushes to the
+  same repo (different files: `lecture-notes/`, `readings/`, `exam-prep.md`).
+- **File ownership:** you own `robot/`, `project/` implementation details, this file.
+  Do not edit `lecture-notes/`, `readings/`, `exam-prep.md` (notes thread owns those).
+
+## Task status & next steps
+### Docking (Task 1) — homing DONE, endgame pending hardware
+- Homing tested end-to-end: seek → early-lock → approach → reaches the phone. Fast.
+- The docking state machine is already in code.py (hall watched during moves → stop →
+  0.5 s settle → re-verify → LED → hold; boot self-check vs miswired hall).
+- **TODO:** get magnet (try flipping pole if range is bad; ask for neodymium) → run
+  `hall_test.py` → set `MAGNET_DETECTED` → confirm LED on GP8 → flip
+  `DOCKING_ENABLED = True` → build funnel + 1×1 cm target → full rehearsal.
+  Scored: +10 full target coverage, −5 if indicator shown while moving (the settle
+  logic guards this — don't weaken it). Run lasts ≥3 min: dock and HOLD.
+### Environment mapping (Task 2) — analysis done, code not started
+- Read `project/environment-mapping.md` first. Recommended Plan A: bumper (or IMU spike)
+  contact + odometry; find obstacle (it's a contact at a pose where no wall should be —
+  start corner is known, arena 120×120); hug one lap (optionally drop the magnet at first
+  contact, hall ping = loop closed); classify by **turn distribution** (3 bursts =
+  triangle, continuous = disk); report via LED + telemetry at ≤5 min.
+- **Blocked on:** examining the physical shapes (height/color/size may yield a cheaper
+  discriminator), choosing contact sensor (microswitch vs IMU), instructor clarifications
+  (wall-touching obstacle? exterior mods? pushing legal?).
+- Suggested structure: keep code.py = docking; build `mapping_code.py` alongside, swap
+  whichever is needed onto the board as code.py for runs (or a MODE constant).
+
+## Known pitfalls (learned the hard way)
+1. Any motion code with pauses MUST keep the motor.py idle-resync fix.
+2. rpm > 8 untested under load; 12 definitely stalls. Test with motor_test on battery first.
+3. CircuitPython auto-reload runs code on save — robot moves immediately; wheels-up on desk.
+4. Eject (`diskutil eject /Volumes/CIRCUITPY` or Finder) before unplugging.
+5. The phone strobe app's preset must stay at the measured 9.28 Hz setting, or re-measure.
+6. Public repo: no credentials, no instructor slide PDFs (they live outside the repo in
+   `../reading_material/lecture_slides/`).
+
+## Handover log (append entries here)
+- **2026-06-10 (notes thread):** file created. Homing calibrated & working; docking awaits
+  magnet; mapping analyzed, no code yet. Repo clean & pushed at this commit.
