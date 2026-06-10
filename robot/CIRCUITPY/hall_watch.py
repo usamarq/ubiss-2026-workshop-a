@@ -1,8 +1,9 @@
-# payload_hall_watch.py - runs ON THE BOARD via serial_exec.py.
+# hall_watch.py - open in Thonny and press Run (or exec via tools/serial_exec.py).
 # Watches GP10 AND GP27 (the two candidate hall pins: hall_test.py says the
 # sensor is on the GP10 connector, code.py/HANDOVER said GP27) and prints
 # every transition. One magnet session answers: which pin, which level means
 # "magnet present", which pole works, and whether the signal is clean.
+# Bring the magnet to the sensor's flat face; try BOTH poles, vary distance.
 import board
 import digitalio
 import time
