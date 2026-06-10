@@ -140,3 +140,13 @@ Team project = two scored tasks built on a small robot:
   (Plan A); classifier desktop-tested (4/4 synthetic laps). Docking unchanged, still awaiting
   magnet + hall_test. Note: `docking_code.py` (tracked) is the earlier standalone
   Thonny-runnable variant, superseded by code.py — kept as a fallback.
+- **2026-06-10 (robot thread, board session):** board mounted, all 8 board files verified
+  identical to repo. Neodymium magnets acquired. ⚠️ **Hall pin discrepancy found:**
+  `hall_test.py` says the sensor is on the **GP10** connector (active-low), but code.py +
+  this file said **GP27** / `MAGNET_DETECTED=True`. Serial baseline (motors stopped, both
+  pins pulled up): **GP10 idles 1, GP27 idles 0** — something actively pulls GP27 low, so
+  the two stories conflict; magnet watch will decide. Added `robot/tools/serial_exec.py`
+  (drive the REPL from the desktop: interrupt code.py, exec a payload, stream prints —
+  Thonny must NOT hold the port) + `robot/tools/payload_hall_watch.py` (watches GP10+GP27,
+  prints transitions; also Thonny-runnable, DURATION defaults 60 s). User testing via
+  Thonny. code.py NOT yet changed — awaiting magnet-watch verdict.
