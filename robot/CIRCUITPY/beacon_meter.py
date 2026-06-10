@@ -47,6 +47,10 @@ vals = ls if peak_to_peak(ls) >= peak_to_peak(rs) else rs
 name = "L" if vals is ls else "R"
 pp = peak_to_peak(vals)
 print("using sensor", name, "| wobble (max-min):", pp)
+print("raw levels: L min/max", min(ls), max(ls), "| R min/max", min(rs), max(rs))
+if max(ls) > 60000 or max(rs) > 60000:
+    print("WARNING: sensor near 65535 = SATURATED by ambient light.")
+    print("Hood/shade the diodes or dim the room - thresholds can't fix this.")
 
 if pp < 1000:
     print("RESULT: no clear blink seen (wobble too small).")

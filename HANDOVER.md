@@ -32,7 +32,8 @@ Team project = two scored tasks built on a small robot:
   GP10 has nothing on it (old hall_test.py comment was stale, since fixed).
   ⚠️ Unplugged hall floats HIGH = false "docked"; boot self-check only catches boot-time —
   keep the connector seated.
-- **Indicator LED:** GP8 (existence on the physical robot unconfirmed).
+- **Indicator LED:** GP8 — **CONFIRMED lit** 2026-06-10 (code_manual.py manual mode
+  drives it solid ON; user saw it).
 - **Dead reckoning:** stepper step counts = free odometry (positions in `motor.position`).
 
 ## Software state (all in `robot/CIRCUITPY/`, mirrored on the board)
@@ -108,9 +109,12 @@ Team project = two scored tasks built on a small robot:
   0.5 s settle → re-verify → LED → hold; boot self-check vs miswired hall).
 - ~~get magnet~~ ✓ ~~verify hall~~ ✓ (GP27, MAGNET_DETECTED=True, one pole — see
   hardware truth) ~~flip DOCKING_ENABLED~~ ✓ deployed 2026-06-10.
-- **TODO:** full-routine test (beacon at 9.28 Hz preset + magnet working-face-up at its
-  base) → confirm LED on GP8 physically exists → measure hall trigger range for the
-  funnel throat → build funnel + 1×1 cm target → full rehearsal from 3 starts.
+- ~~confirm GP8 LED~~ ✓ (lit, 2026-06-10). One full dock achieved (lucky straight cross).
+- **TODO:** reliable repeat docking: meter-check the REPLACED R diode → full-routine
+  test (strobe on the ~9.3 Hz preset, max brightness; magnet cluster 10-15 cm in front
+  of the phone) → measure hall trigger range/zone (manual mode + LED-out makes this
+  easy) → build funnel + 1×1 cm target → recalibrate thresholds in the FINAL room
+  (SWEEP_LEVEL, then re-enable the rake) → full rehearsal from 3 starts.
   Scored: +10 full target coverage, −5 if indicator shown while moving (the settle
   logic guards this — don't weaken it). Run lasts ≥3 min: dock and HOLD.
 ### Environment mapping (Task 2) — scaffold written, blocked on contact sensor + shape exam
@@ -163,3 +167,18 @@ Team project = two scored tasks built on a small robot:
   + verified-evidence comments in code.py; hall_test.py rewritten (was stale GP10/
   active-low); both deployed to board + cmp-verified; HANDOVER hardware truth updated.
   Next: full-routine test with beacon + magnet, confirm GP8 LED, measure trigger range.
+- **2026-06-10 (robot thread, evening live-tuning — working tree UNCOMMITTED by user
+  request, batch when tested):** full pipeline docked ONCE (straight-line lucky cross).
+  R photodiode found electrically dead (railed ~65.3k in every condition) → user
+  PHYSICALLY REPLACED it (new diode untested). Bright-room recalibration from
+  beacon_meter: facing@1m ~929 (L alone), mat-distance ~5020, off-axis noise 300-420 →
+  BEACON_HZ 9.4, LOOK_PERIODS 2.4 (new), SEEK_EXIT 1400, LOST 1000, NEAR 7000.
+  New code.py machinery: raw-extremes telemetry, blind-guard (railed diode mirrors the
+  seeing side), fine_aim 5-point re-aim every 4 strides, rake endgame (RAKE_ENABLED =
+  **False** — misfired when room/app conditions shifted; recalibrate SWEEP_LEVEL in the
+  final room before enabling). `code_manual.py` = code.py + web AUTO/MANUAL toggle +
+  arrow-key drive + hall-echo LED; **INSTALLED AS THE BOARD'S code.py** — ⚠️ board
+  code.py now matches repo `code_manual.py`, NOT repo code.py. Swap the lean code.py
+  back for scored runs. Boots in **MANUAL** (robot stays put on power-up; start runs
+  by pressing AUTO on the page). Strobe app must stay on the ~9.3 Hz preset (a "brighter" app
+  mode measured 4.35 Hz / 83% duty — breaks flicker detection).

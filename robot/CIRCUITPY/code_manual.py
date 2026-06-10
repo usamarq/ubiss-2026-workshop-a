@@ -1,3 +1,12 @@
+# code_manual.py - code.py PLUS a manual-drive mode on the WiFi page.
+# Same autonomous pipeline (seek -> home -> dock), but http://192.168.4.1/
+# now shows the log AND an AUTO/MANUAL toggle: in MANUAL the arrow keys
+# (or WASD, or on-screen pad) drive the robot; the LED is solid ON (robot
+# alive) and goes OUT over the magnet, so you can hunt it by hand. AUTO starts
+# the autonomous run from the seek; back to MANUAL cancels it and halts.
+# BOOTS IN MANUAL: the robot stays put on power-up until you press AUTO.
+# Run from Thonny to try it; rename to code.py on the board to make it boot.
+# NOTE: serves its own combined page - do NOT also run telemetry.serve().
 import time
 import board
 import asyncio
@@ -120,6 +129,12 @@ RAKE_CREEP  = 160            # ~0.8 cm forward between swings: the rake mesh
                              # (first run missed the magnet with 1.5 cm mesh)
 RAKE_CYCLES = 18             # swings before giving up (~12 cm of mat depth)
 RAKE_BACKUP = 2000           # ~10 cm reverse after an empty rake, re-approach
+
+# manual mode (web page arrow keys). Directions derive from the SAME verified
+# convention constants as autonomous driving, so they can't disagree.
+LEAD    = 200                # steps the target stays ahead while a key is held
+DEADMAN = 0.8                # s without a command -> auto stop (page re-sends
+                             # the held key every 250 ms)
 # ====================================================
 
 
@@ -342,12 +357,261 @@ async def dock_sequence():
     return False
 
 
+# ===================== MANUAL MODE + WEB UI =====================
+DIRECTIONS = {
+    "F": (FWD_M1, FWD_M2),        # forward = OPPOSITE signs (mirror-mounted)
+    "B": (-FWD_M1, -FWD_M2),
+    "L": (SPIN_M1, SPIN_M2),      # spin(+) = LEFT (verified on this robot)
+    "R": (-SPIN_M1, -SPIN_M2),
+    "S": (0, 0),
+}
+
+mode = "manual"                   # boot in MANUAL: robot stays put until you
+                                  # switch to AUTO on the web page
+manual_state = "S"
+last_cmd = 0.0
+auto_task = None
+
+
+async def autonomous():
+    # The whole code.py mission as one cancellable task: home, dock, hold.
+    while True:
+        await light_follow()
+        if await dock_sequence():
+            break
+    while True:
+        await asyncio.sleep(1)
+
+
+def halt_motors():
+    motor1.move_to(motor1.position)
+    motor2.move_to(motor2.position)
+
+
+def set_mode(m):
+    global mode, auto_task, manual_state
+    if m not in ("auto", "manual") or m == mode:
+        return
+    mode = m
+    manual_state = "S"
+    if m == "manual":
+        if auto_task is not None:
+            auto_task.cancel()
+            auto_task = None
+        halt_motors()
+        log("MODE: MANUAL - arrow keys drive; LED solid = on, out = magnet")
+    else:
+        halt_motors()
+        led.value = False
+        log("MODE: AUTO - restarting from seek")
+        auto_task = asyncio.create_task(autonomous())
+
+
+async def drive_loop():
+    # Keeps the targets just ahead of position while a key is held; stops on
+    # release or deadman. Only touches motors in manual mode. The LED echoes
+    # the hall sensor so you can hunt the magnet by hand.
+    global manual_state
+    was_magnet = False
+    while True:
+        if mode == "manual":
+            if manual_state != "S" and time.monotonic() - last_cmd > DEADMAN:
+                manual_state = "S"
+            d1, d2 = DIRECTIONS[manual_state]
+            if d1 == 0 and d2 == 0:
+                halt_motors()
+            else:
+                motor1.move_to(motor1.position + d1 * LEAD)
+                motor2.move_to(motor2.position + d2 * LEAD)
+            # LED as power indicator in manual: solid ON = robot alive,
+            # goes OUT while the hall sits over a magnet (inverted echo)
+            magnet = hall.value == MAGNET_DETECTED
+            led.value = not magnet
+            if magnet and not was_magnet:
+                log("HALL: magnet under the sensor")
+            was_magnet = magnet
+        await asyncio.sleep(0.05)
+
+
+PAGE = """<!DOCTYPE html>
+<html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UBISS robot</title><style>
+ body{font-family:sans-serif;background:#111;color:#eee;text-align:center;
+      user-select:none;-webkit-user-select:none;margin:0;padding:1em}
+ #bar{margin:.5em}
+ #toggle{font-size:18px;padding:.5em 1.5em;border:none;border-radius:10px;
+         background:#a40;color:#fff}
+ #toggle.manual{background:#2a7;color:#000}
+ #pad{display:inline-grid;grid-template-columns:repeat(3,70px);grid-gap:6px;
+      margin:.5em;opacity:.25}
+ #pad.on{opacity:1}
+ #pad button{font-size:24px;height:70px;border:none;border-radius:10px;
+             background:#333;color:#eee}
+ #pad button:active,#pad button.on{background:#2a7;color:#000}
+ .blank{visibility:hidden}
+ pre{background:#000;color:#9f9;font:13px/1.45 monospace;text-align:left;
+     padding:.8em;border-radius:8px;max-height:50vh;overflow:auto}
+</style></head><body>
+<div id="bar"><button id="toggle">AUTO</button></div>
+<div id="pad">
+ <div class="blank"></div><button data-cmd="F">&#9650;</button><div class="blank"></div>
+ <button data-cmd="L">&#9664;</button><button data-cmd="S">&#9209;</button>
+ <button data-cmd="R">&#9654;</button>
+ <div class="blank"></div><button data-cmd="B">&#9660;</button><div class="blank"></div>
+</div>
+<div style="color:#888;font-size:.85em">manual: hold arrow keys / WASD or the pad</div>
+<pre id="log">connecting...</pre>
+<script>
+let mode='auto',active=null,timer=null;
+const send=p=>fetch(p).catch(()=>{});
+function ui(){
+  const t=document.getElementById('toggle'),p=document.getElementById('pad');
+  t.textContent=mode.toUpperCase();
+  t.classList.toggle('manual',mode==='manual');
+  p.classList.toggle('on',mode==='manual');
+}
+async function poll(){
+  try{
+    const t=await(await fetch('/log')).text();
+    const nl=t.indexOf('\\n');
+    mode=(t.slice(0,nl).split(' ')[1])||'auto';
+    document.getElementById('log').textContent=t.slice(nl+1);
+    ui();
+  }catch(e){}
+}
+setInterval(poll,1000);poll();
+document.getElementById('toggle').onclick=()=>
+  send('/mode?m='+(mode==='auto'?'manual':'auto')).then(()=>setTimeout(poll,150));
+function start(c){
+  if(mode!=='manual'||active===c)return;
+  active=c;send('/'+c);
+  clearInterval(timer);timer=setInterval(()=>send('/'+c),250);
+  document.querySelectorAll('#pad button').forEach(b=>
+    b.classList.toggle('on',b.dataset.cmd===c));
+}
+function stop(){
+  active=null;clearInterval(timer);send('/S');
+  document.querySelectorAll('#pad button').forEach(b=>b.classList.remove('on'));
+}
+const KEYS={ArrowUp:'F',ArrowDown:'B',ArrowLeft:'L',ArrowRight:'R',
+            w:'F',s:'B',a:'L',d:'R',W:'F',S:'B',A:'L',D:'R'};
+addEventListener('keydown',e=>{const c=KEYS[e.key];if(!c)return;
+  e.preventDefault();if(!e.repeat)start(c);});
+addEventListener('keyup',e=>{const c=KEYS[e.key];if(!c)return;
+  e.preventDefault();if(active===c)stop();});
+document.querySelectorAll('#pad button').forEach(b=>{
+  const c=b.dataset.cmd;
+  b.addEventListener('pointerdown',e=>{e.preventDefault();
+    c==='S'?stop():start(c);});
+  b.addEventListener('pointerup',stop);
+  b.addEventListener('pointerleave',()=>{if(active===c)stop();});
+  b.addEventListener('pointercancel',stop);
+});
+</script></body></html>"""
+
+
+def _http(content_type, body):
+    if isinstance(body, str):
+        body = body.encode("utf-8")
+    head = ("HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %d\r\n"
+            "Connection: close\r\n\r\n" % (content_type, len(body)))
+    return head.encode("utf-8") + body
+
+
+async def _read_request_line(conn, timeout=1.0):
+    buf = b""
+    chunk = bytearray(256)
+    t0 = time.monotonic()
+    while b"\r\n" not in buf:
+        if time.monotonic() - t0 > timeout:
+            break
+        try:
+            n = conn.recv_into(chunk)
+            if n == 0:
+                break
+            buf += bytes(chunk[:n])
+        except OSError:
+            await asyncio.sleep(0)
+    return buf.split(b"\r\n", 1)[0].decode("utf-8") if buf else ""
+
+
+async def _send_all(conn, data, timeout=1.0):
+    view = memoryview(data)
+    sent = 0
+    t0 = time.monotonic()
+    while sent < len(data):
+        if time.monotonic() - t0 > timeout:
+            break
+        try:
+            sent += conn.send(view[sent:])
+        except OSError:
+            await asyncio.sleep(0)
+
+
+async def _handle(conn):
+    global manual_state, last_cmd
+    conn.setblocking(False)
+    line = await _read_request_line(conn)       # "GET /F HTTP/1.1"
+    if not line:
+        return
+    parts = line.split(" ")
+    full = parts[1] if len(parts) > 1 else "/"
+    path, _, query = full.partition("?")
+
+    if path == "/" or path == "/index.html":
+        await _send_all(conn, _http("text/html", PAGE))
+    elif path == "/log":
+        body = "MODE " + mode + "\n" + "\n".join(reversed(telemetry._lines))
+        await _send_all(conn, _http("text/plain", body))
+    elif path == "/mode":
+        set_mode(query.partition("=")[2])
+        await _send_all(conn, _http("text/plain", mode))
+    else:
+        cmd = path[1:].upper()
+        if cmd in DIRECTIONS and mode == "manual":
+            manual_state = cmd
+            last_cmd = time.monotonic()
+        await _send_all(conn, _http("text/plain", "ok"))
+
+
+async def serve_ui():
+    # Combined log + control server (replaces telemetry.serve - same port).
+    pool = telemetry._pool
+    if pool is None:
+        return
+    srv = pool.socket(pool.AF_INET, pool.SOCK_STREAM)
+    try:
+        srv.setsockopt(pool.SOL_SOCKET, pool.SO_REUSEADDR, 1)
+    except (AttributeError, OSError):
+        pass
+    srv.bind(("0.0.0.0", 80))
+    srv.listen(4)
+    srv.setblocking(False)
+    while True:
+        try:
+            conn, _addr = srv.accept()
+        except OSError:
+            await asyncio.sleep(0.02)
+            continue
+        try:
+            await _handle(conn)
+        except Exception as e:
+            log("web request error:", e)
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+# ================================================================
+
+
 async def main():
-    global DOCKING_ENABLED
+    global DOCKING_ENABLED, auto_task
     asyncio.create_task(motor1.run())
     asyncio.create_task(motor2.run())
     if telemetry.start():
-        asyncio.create_task(telemetry.serve())
+        asyncio.create_task(serve_ui())     # combined log + manual-control page
+    asyncio.create_task(drive_loop())
 
     # Boot self-check: an unwired/mispolarized hall would read "docked" here
     # and freeze the robot at the start line. Detect that and fall back to a
@@ -357,13 +621,9 @@ async def main():
         log("Docking checks DISABLED for this run (pure light-follow).")
         DOCKING_ENABLED = False
 
+    log("MODE: MANUAL at boot - robot waits. Switch to AUTO on the web page.")
     while True:
-        await light_follow()            # returns only on dock contact
-        if await dock_sequence():
-            break                       # docked, stationary, indicator on
-    while True:
-        await asyncio.sleep(1)          # hold forever: coils + magnet keep us put,
-                                        # telemetry stays up
+        await asyncio.sleep(1)          # mode switches happen via the web page
 
 
 asyncio.run(main())
