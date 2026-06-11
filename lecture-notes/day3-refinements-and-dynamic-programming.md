@@ -1,100 +1,115 @@
-# Refinements & Approximate Information Spaces
+# Refinements & Approximate Information Spaces ("The Art of Forgetting")
 
 > **Workshop A — Minimalism in Robotics** · UBISS 2026
-> Day 3 · Wed Jun 10 · Lecture · Fort TS128
-> Status: 🟢 in-class notes added (Jun 10). **Note:** the Wed slide deck on disk covers the *filters/reduction* lecture (→ `day3-filters-plans-and-reduction-algorithms`, reconciled) + *Future Directions* (→ `day3-future-directions`); a separate deck for THIS refinements lecture wasn't in the folder, so the **⟵ verify w/ slides** flags below stand until it appears. The reduction deck independently confirms the shared vocabulary (combinatorial filters, plans-as-filters, Output Simulation, minimal/sufficient).
-> 🧮 = beginner explainer. (This is the instructors' own research line — Sakçak/LaValle's *information transition systems*.)
+> Day 3 lecture · Status: 🟢 **reconciled with the Lecture 6 slides** (Sakçak et al.)
+> 🧮 = beginner math explainer. (This is the instructors' own research: Sakçak–Timperi–Weinstein–LaValle, *"A mathematical characterization of minimally sufficient robot brains,"* IJRR 2023.)
 
 ## TL;DR
-The history I-space is the *maximal* internal representation — and far too big. This lecture is about **collapsing histories while keeping something useful**: which information must be **preserved** for a task, formalized via **quotients of transition systems**, **sufficient I-maps**, and ultimately the **minimal sufficient** representation — the smallest "brain" that still does the job. Tasks split into **passive** (filtering) and **active** (planning/policies), and casting tasks as **cost/reward optimization** connects all of this to dynamic programming and **reinforcement learning**.
+The slides call it **"the art of forgetting"**: *how much can we collapse histories and still have something useful — what information should be preserved?* Answer: model the robot's "brain" as an **Information Transition System (ITS)**, collapse it with a **labeling/I-map κ**, require **sufficiency** (the collapse must stay consistent with the dynamics), and refine a task labeling **just until** it becomes sufficient. The headline theorem: a **minimal sufficient refinement exists and is unique** — every task has a well-defined smallest brain.
 
 ---
 
-## 1 · The central question
-> **What information must be preserved?**
+## 1 · The system picture (the slide everyone should memorize)
+```
+Physical World --(sensor h)--> y --> [ Internal System ι ] --(policy π(ι))--> u --> back to world
+```
+- `Y` = all possible observations, `U` = all possible actions; time is discrete, stage `k`.
+- The interaction so far is the **history** `η_k = (y₁, u₁, y₂, u₂, …, u_{k-1}, y_k)`.
+- The internal state `ι_k` (an **information state**) *encodes* this history.
 
-Full histories `η_k = (y₁,u₁,…,y_k)` grow forever. We want to **collapse** them into something small that is *still useful* — where "useful" means: you can still (a) keep it updated, and (b) accomplish your task. Everything below is machinery for making "collapse but stay useful" precise.
+## 2 · Background math, gently
+- **Preimage / equivalence classes / partition.** For `τ : A → B`, the preimage `τ⁻¹(b) = {a ∈ A | τ(a) = b}`. The preimages form **equivalence classes** that **partition** A.
+  > 🧮 Same machinery as the Day-2 sensor preimages: a function over a set slices the set into "treated-as-the-same" groups.
+- **Labeled transition system** = triple `(S, Λ, T)`: states `S`, edge labels `Λ`, transitions `T ⊆ S × Λ × S`.
+  > 🧮 Circles + labeled arrows. `T` is just the list of arrows: (from-state, label, to-state).
+- **State-relabeled transition system** = `(S, Λ, T, σ, L)` — add a **labeling function** `σ : S → L` painting each state with a label from `L`.
+  > 🧮 The label is what you *care about* at that state (an output, an action, "goal/not-goal").
+- **Quotient transition system.** The preimages of `σ` partition `S` into classes `[s]_σ = {s′ | σ(s′) = σ(s)}`. Collapse each class to a single super-state: states `S/σ`, arrows inherited class-to-class. That's the **quotient** of the system by σ.
+  > 🧮 The subway map: merge all individual streets (states) with the same label into one station, keep the connections. The formal bit `S/σ` just means "the set of merged groups."
 
-## 2 · Transition systems (the modeling language)
-- A **transition system** = a graph: **states** + labeled **arrows** (transitions) saying how inputs move you between states. (Like a board game: circles and moves.)
-- A **state-relabeled transition system** adds a **labelling function** that paints each state with an output/label — marking *what you care about* (e.g. "goal / not-goal", a color, "door open / closed").
+## 3 · Information Transition System (ITS)
+**The internal system is an ITS**: `S = (I, Λ, φ, ι₀)` —
+- `I` = an information space; `ι₀` = initial I-state;
+- `Λ` = edge labels — the lecture uses `Λ = Y` (observations), `Λ = U` (actions), or `Λ = U × Y` (both);
+- `φ : I × Λ → I` = the **information transition function** (how the I-state updates per event).
 
-> 🧮 **Why labels?** The label is the *task-relevant* part of a state. Two states with the same label are "the same as far as the task cares" — *unless* their future behaviour differs. Labels are how a task gets injected into the math.
-
-- **External vs internal:** the *external* system models the physical world (robot body + environment). The **internal system** is what runs in the robot's head — an **Information Transition System (ITS)**: its states are **I-states**, and incoming observations/actions drive its transitions. **⟵ verify w/ slides**
-- **History ITS** — the internal system whose states are full histories: the *maximal* ITS. Everything else is a compression of it.
-
-## 3 · Quotient transition systems — "collapse but stay consistent"
-- Take a labelling/equivalence on states → **merge** each group of equivalent states into one super-state → the **quotient transition system**.
-- The quotient is only *legitimate* if it stays **consistent with the dynamics**: whenever you merge states, their merged transitions must still be well-defined (same input from the merged state can't need to go to two different merged states). **⟵ verify w/ slides for the exact condition used**
-
-> 🧮 **Subway-map analogy.** A city map (every street = every history) vs the subway map (stations = merged regions). The subway map is *useful* because it's consistent: "take line U from station A" has one well-defined result. A quotient is exactly that: a smaller map that still navigates correctly. "Which states are useful to distinguish?" = "which stations must not be merged?"
-
-## 4 · Sufficient I-maps → Minimal sufficient I-maps ⭐
-- An **I-map** `κ` collapses history I-states into derived I-states (Day 2). It is **sufficient** if the derived I-state can be **updated from itself + the new action/observation alone** — no peeking back at the history — *and* it still determines what the task needs.
-- A **minimal sufficient I-map** is a sufficient I-map that **cannot be collapsed any further** — merge any two of its states and either the update rule breaks or the task answer is lost. It's the **coarsest quotient that still works**: the smallest internal system for the job.
-
-> 🧮 **Simple example — the parity counter.** Task: report whether the robot has crossed an **even or odd** number of doorways.
-> - Full history: the entire walk log — unbounded.
-> - Sufficient I-map: **one bit** `{even, odd}`, flipped every time a doorway is sensed. Updatable from itself + the latest observation ✓, answers the task ✓.
-> - **Minimal**: try to compress further — one single state can't distinguish even from odd ✗. So the 2-state filter is **the minimal sufficient ITS**. An infinite history space collapsed to **two states**, with zero loss *for this task*.
->
-> 🧮 **Live example — our docking robot.** For "drive to the strobe," the full history of light readings collapses to **four derived I-states**: `{left-brighter, right-brighter, balanced, lost}` (computed from the current wobble pair). That's a sufficient I-map for homing — and it's (close to) minimal: merge any two and the behaviour breaks. Our actual `code.py` *is* a small ITS.
-
-- Analogy worth knowing: this is the same idea as **minimizing a finite automaton** (merge indistinguishable states); "can't-collapse-further" plays the role of Myhill–Nerode equivalence. **⟵ verify w/ slides if they named it**
-
-## 5 · Tasks: passive vs active
-Tasks are specified by **labelling** (what counts as correct output / goal).
-
-| | **Passive task** | **Active task** |
+A **state-relabeled ITS** adds a labeling `ℓ : I → L`. Three labelings matter:
+| Labeling | Type | Meaning |
 |---|---|---|
-| Robot's job | **track / report** something as data streams in | **achieve** something by choosing actions |
-| Robot chooses actions? | no (or they're irrelevant to the task) | yes — that's the point |
-| Solved by | a **filter** (I-state update + readout) | **planning / a policy** over I-states |
-| Example | "always know which room I'm in", people-counting | "dock on the target", "reach the kitchen" |
+| **I-map** | `κ : I_hist → I` | "compress histories to derived I-states" |
+| **Policy** | `π : I → U` | "what to do in each I-state" |
+| **Task labeling** | `κ_task : I_hist → {0,1}` | "is this history task-accomplishing?" |
 
-> 🧮 **How the filtering/planning split works.** A *passive* task only needs correct **bookkeeping**: maintain the I-state, answer the question — that maintenance loop *is* a filter. An *active* task needs **choices**: a **policy** `π : I-state → action`. But notice the policy must be fed by an I-state — so **every active task contains a passive core** (track enough to act on). Filter design underlies planning; that's why tomorrow's filter-minimization results matter for both.
+**History ITS** `S_hist = (I_hist, U×Y, φ_hist, ())` — states are whole histories; the transition is just **concatenation** `η_k = η_{k-1} ⌢ (u_{k-1}, y_k)`. Maximal information, but **impractical: it grows linearly forever** → we derive smaller ITSs from it via κ.
 
-- **Policy** = a rule mapping each internal state to an action (this lecture's "introduction of policies in robotic systems").
-- **Reactive policy** = a policy that needs **only the current (latest) derived I-state — no extra memory**. Braitenberg vehicles are the purest case: sensor wired to motor. Our homing loop is a reactive policy over its 4 derived states.
+## 4 · Sufficiency — the exact condition ⭐
+> **Definition (slide 11):** κ is **sufficient** iff for all histories `s, t` and every event `λ`:
+> `κ(s) = κ(t)` and `s′ = φ(s,λ)`, `t′ = φ(t,λ)` **⟹** `κ(s′) = κ(t′)`.
 
-> 🧮 **How reactive ties to refinements.** Whether a *reactive* policy suffices depends on **how far you collapsed**. If the task's minimal sufficient ITS is computable from the current reading alone (docking: yes), a reactive policy works — maximum minimalism. If the task inherently needs **memory** (parity: you must *remember* the bit), pure reactivity fails, and you must **refine** — preserve more information (add states/memory). Refinement ↔ moving finer along the spectrum: *reactive (coarsest) … minimal sufficient … full history (finest)*. The task fixes how coarse you may go; minimalism says: go exactly there.
+> 🧮 **In words:** if the compressed brain treats two histories as *the same*, then after experiencing the *same next event*, it must **still** treat the results as the same. The collapse must never need un-forgetting.
+> **Parity check:** histories "2 doorways" and "4 doorways" both map to EVEN. After one more doorway both become ODD — same derived state ✓. Sufficient. A collapse mapping "2 doorways" and "3 doorways" to one state would break instantly (next doorway sends them to different answers) ✗.
+>
+> Plus the second requirement: κ must **preserve crucial task information** — histories that the task needs distinguished stay distinguished.
 
-## 6 · Tasks as cost/reward optimization → DP & RL
-- Generalize "goal labels" to **costs/rewards** per state-action; the task = optimize cumulative cost/reward.
-- With a **known model**: **dynamic programming** (value iteration / Bellman backups) computes optimal policies over the (derived) I-space — feasible only if the I-space is small ⇒ another reason to want minimal/approximate I-spaces.
-- With an **unknown model**: **reinforcement learning** — learn the policy/value from experience. Modern RL agents with memory (recurrent nets) are implicitly *learning a sufficient I-map*; "state abstraction" in RL is this lecture's quotient idea in learned form. **⟵ verify w/ slides for how deep they went**
+## 5 · Minimal sufficient refinement (the headline) ⭐
+The natural starting point is the **task labeling itself** (label each history by, e.g., which action to take, or accomplishing/not). **This is typically NOT sufficient.** Fix: **refine** it — split its classes — *just until* sufficiency holds.
 
-## 7 · Approximate information spaces
-Exact minimal sufficient ITSs can be hard to compute (ties into tomorrow's NP-hardness of filter reduction). So in practice: **approximate** — quantize the I-space, cap memory, or learn a representation — trading some optimality/guarantees for tractability. **⟵ verify w/ slides for the specific approximation scheme shown**
+> **Definition:** a **minimal sufficient refinement** of κ is a sufficient `κ′` such that **no** sufficient `κ″` sits strictly between: `κ′ ≻ κ″ ⪰ κ`. (`≻` = "is strictly finer than," the same refinement order as the sensor lattice.)
+>
+> **Theorem (Sakçak–Timperi–Weinstein–LaValle 2023):** minimal sufficient refinements **exist and are unique** in a general setting.
+
+> 🧮 **Why this is a big deal:** "the smallest brain for the task" is not just poetry — it's a **well-defined, unique mathematical object**. You start from *what the task cares about* (too coarse) and add only the distinctions the dynamics force on you; the process bottoms out in exactly one place.
+
+### Worked example from the slides — the two gates 🟥🟩
+Setup: a robot circulates past two gates, **red** and **green** (`Y = {r, g}`, histories = strings of r/g). **Task:** *"is the robot crossing the gates consistently (going cw the whole time, or ccw the whole time)?"* — a passive task, `κ_task : I_hist → {0,1}`.
+- The history ITS is an infinite binary tree: (), (r), (g), (r,r), (r,g), …
+- `κ_task` alone (just "consistent so far? yes/no") is **not sufficient** — knowing "yes" isn't enough to update: you also need *which gate came last* (consistent-ending-in-r behaves differently from consistent-ending-in-g on the next observation).
+- Refining until sufficient yields **4 states**: `ι₀` (start), `ι_r` (consistent, last saw red), `ι_g` (consistent, last saw green), `ι_nt` (not consistent — absorbing). The infinite tree **quotients down to a 4-state machine**, and `κ_task` factors through it: `κ_task = κ″ ∘ κ′` (first compress to the 4 states, then read off yes/no).
+> 🧮 This is the parity example's big sibling: task label alone too coarse → forced to remember *one extra fact* (last gate) → done. Minimal, unique.
+
+## 6 · Tasks: passive vs active (now formal)
+- **Passive task** = maintain the **label** of the history as it grows → **filtering**.
+- **Active task** = make the realized history of the **coupled system** land in the desired set `κ_task⁻¹(1)` → **planning**.
+- The **coupled system** `S_π ⋆ X_h` pairs the internal ITS with the external world: `x_{k+1} = f(x_k, u_k)`, `y_k = h(x_k)`, `ι_k = φ(ι_{k-1}, y_k)`, `u_k = π(ι_k)` — brain and world driving each other in a loop, state space `I × X`.
+- A policy is **feasible** if **every** possible initialization of the coupled system yields a task-accomplishing history.
+- Tasks can also be specified by logic or **cost/reward** (§8) — "with caution," per the slides.
+
+## 7 · Minimally sufficient structures (the 2024 results)
+Two "what's the least…?" questions (Sakçak–Weinstein–Timperi–LaValle, WAFR 2024):
+- **Minimal policy:** the smallest ITS that can *represent* a given feasible policy. Formalized via "**supports**": ITS `S` supports the history policy iff relabeling its states with actions reproduces the same input→output behaviour (🧮 — this is exactly Wednesday's **Output Simulation** in ITS clothing). **Theorem:** S supports π iff S is a **quotient** of the (policy-restricted) history ITS by a sufficient `κ ⪰ π` — and the **minimal one exists, is unique: the minimal sufficient refinement of π**.
+- **Minimal sensor:** fix the brain to be *memoryless* — `I = Y`, i.e. the I-state IS the latest observation (a **reactive policy**). **Theorem:** a sensor `h` is sufficient for a reactive policy **iff `h ⪰ π_X`** for some feasible state-feedback policy — the sensor must *dominate* (refine) the policy's action-partition. And such a `π_X` exists iff some feasible policy applies the **same action at a state regardless of stage**.
+> 🧮 **Reading the sensor result with our robot:** the docking policy needs to distinguish only {steer-left / steer-right / forward / re-scan}. Any sensor whose partition refines *that 4-way split* suffices — our two photodiodes do. The sensor-lattice `⪰` from Day 2 turns out to be exactly the right yardstick for "is this sensor enough for a reflex agent?"
+
+Slide example — **Maze, Mouse & Cheese 🐭🧀**: actions `U = {→, ←}`, histories = action strings, `κ_task` labels cheese-reaching sequences 1 (mouse teleports back on exiting). Tiny world where you can compute these minimal objects by hand.
+
+## 8 · Tasks as cost/reward → DP → (approximate) RL
+- Add a **reward `r_k`** each stage; the task = maximize cumulative reward `J(π) = E[Σ r_k]`.
+- **Dynamic-programming recurrence:** `V_k(η_k) = max_u E[ r_k + V_{k+1}(η_{k+1}) | η_k, u_k ]` — an optimal policy satisfies it. 🧮 *"The value of now = best (immediate reward + value of where that lands me)."* Computed over histories it's intractable — so when may we run DP on the **compressed** states instead?
+- **Sufficiency for DP** (Subramanian–Sinha–Seraj–Mahajan, JMLR 2022 — the **approximate information state**): κ must be
+  1. **sufficient for performance evaluation:** `E[r_k | η_k, u_k] = E[r_k | κ(η_k), u_k]` — 🧮 *the summary predicts today's reward as well as the full history would;*
+  2. **sufficient for prediction:** `P(ι_{k+1} | η_k, u_k) = P(ι_{k+1} | κ(η_k), u_k)` — 🧮 *the summary predicts tomorrow's summary.*
+  Hold both ⟹ planning/learning on the compressed brain loses nothing. **This is the bridge to RL:** agents with memory are *learning* an approximate κ with these two properties.
 
 ## Why it matters for *minimalism*
-This is the workshop's thesis made formal: the **minimal sufficient ITS is the smallest brain (memory + distinctions) a task requires**. Below it, the task breaks; above it, you're carrying dead weight.
+The week's thesis as theorems: the smallest brain for a task **exists, is unique** (minimal sufficient refinement), comes from **quotienting** histories, and the **sensor needed for a reflex agent is characterized by dominance** — minimal brains and minimal sensors are two faces of the same refinement order.
 
 ## Connections
-- Builds on `day2-information-spaces` (I-maps, sufficiency) and `day2-sensor-lattices` (refinement order on partitions — same "coarsest that works" logic, now with dynamics).
-- Sets up `day3-filters-plans-and-reduction-algorithms` (computing/minimizing filters; complexity).
-- The docking project is a running example (reactive policy on a 4-state ITS).
+- `day2-information-spaces` (histories, I-maps) · `day2-sensor-lattices` (the `⪰` order does double duty) · `day3-filters-plans-and-reduction-algorithms` (computing these objects = NP-complete in general; Output Simulation ↔ "supports") · `day4-information-invariants` (trading the resources that *supply* the information).
+- References: Sakçak+ 2024 (WAFR), Sakçak+ 2023 (IJRR "minimally sufficient robot brains"), Weinstein+ 2022 (enactivist model of cognition), Subramanian+ 2022 (JMLR).
 
 ## 🎯 Likely exam points
-- *What information must be preserved?* — explain collapsing histories via **quotient transition systems** (labelling → merge → consistency).
-- Define **sufficient I-map** and **minimal sufficient I-map**; give the parity (2-state) example.
-- **Passive vs active tasks** → filtering vs planning; why active tasks still need a filter.
-- Define **policy** and **reactive policy**; when does reactivity suffice (and when is memory unavoidable)?
-- How cost/reward framing connects I-spaces to **DP and RL**.
+- Define **(state-relabeled) transition system** and **quotient** (merge label-equivalence classes, inherit arrows).
+- **ITS** `(I, Λ, φ, ι₀)`; the **History ITS** (concatenation; maximal but grows forever).
+- State the **sufficiency condition** (κ(s)=κ(t) ∧ same event ⟹ κ(s′)=κ(t′)) and check it on a small example (parity / gates).
+- **Minimal sufficient refinement**: definition via `κ′ ≻ κ″ ⪰ κ`, and **existence + uniqueness**.
+- **Passive vs active** tasks (filtering vs planning; coupled system; feasible policy).
+- **Minimal sensor for a reactive policy ⟺ `h ⪰ π_X`** (sensor dominance meets policies).
+- DP recurrence + the **two sufficiency conditions** for planning on compressed states (reward + prediction) → approximate information state / RL.
 
-## 📝 In-class notes (raw — Jun 10)
-- Refinements; approximate information spaces; policies in robotic systems.
-- Collapsing histories while keeping something useful — what to preserve?
-- Transition system; state-relabeled transition system; labelling function → **quotient transition system** (which states are useful to distinguish).
-- Internal system = **Information Transition System (ITS)**; **History ITS**; **sufficient I-map**; **minimal sufficient maps**.
-- Task labelling; **passive tasks** (filtering) vs **active tasks** (planning); **reactive policy**.
-- Tasks as **cost/reward optimization**; mention of **reinforcement learning**.
+## 📝 In-class notes (raw — Jun 10/11)
+- Refinements, approximate I-spaces, policies; collapsing histories ("art of forgetting"); what to preserve.
+- Transition system; state-relabeled TS; quotient TS via labeling functions.
+- ITS; History ITS; sufficient I-map; minimal sufficient maps; task labeling; passive (filtering) vs active (planning); reactive policy; cost/reward; RL mention.
 
 ## 📎 Slides
-_Pending — drop the deck in `reading_material/lecture_slides/` and I'll reconcile the ⟵ flags._
-
-## ❓ Open questions
-- Exact consistency condition for a legal quotient (bisimulation-style?) as stated on the slides.
-- Did they give an algorithm for computing the minimal sufficient ITS, or only existence/definitions?
-- The precise definition of "task" used (label sequences? reachability? cost)?
+Reconciled against **`reading_material/lecture_slides/Lecture 6_ Refinements.pdf`** (30 pp). All earlier ⟵ flags resolved: the quotient condition is the sufficiency implication above; minimal sufficient refinements exist & are unique (2023); tasks defined via `κ_task` labelings (binary for planning); DP/RL connection via the approximate-information-state conditions.
