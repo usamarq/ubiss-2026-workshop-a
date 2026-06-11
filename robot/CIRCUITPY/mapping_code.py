@@ -1,17 +1,25 @@
-# mapping_code.py - Task 2: disk vs triangle (project/environment-mapping.md, Plan A).
-# Sensors: ONE contact bit + the steppers' own step counts. Find the obstacle,
-# hug its boundary one lap, classify by how the turning is DISTRIBUTED around
-# the lap: a triangle turns in ~3 concentrated bursts (the corners), a disk
-# turns a little on every stride. Report = LED + telemetry banner.
+# mapping_code.py — Task 2: disk vs triangle
+# "Lighthouse + Specularity Probe"
 #
-# Deploy: copy onto the board AS code.py for mapping runs; docking keeps the
-# repo's code.py. (HANDOVER.md "suggested structure".)
+# PHASE 1 — LIGHTHOUSE: 360° scan from the starting corner, no driving.
+#   Near readings (< 25 cm) = the two adjacent walls; everything else is
+#   the arena interior.  The shortest interior cluster = the obstacle.
+#   The known corner start gives free wall rejection with zero odometry.
 #
-# STATUS: SCAFFOLD. Runs end-to-end in structure, but:
-#   - CONTACT_PIN is None -> boot guard refuses to start (no bumper wired yet).
-#     Stepper stall is NOT software-detectable (open-loop, stalls silently),
-#     so we need a real contact bit: microswitch (best) or IMU spike.
-#   - All *_CM / *_DEG marked TODO are guesses pending shape measurements.
+# PHASE 2 — APPROACH: turn toward the obstacle, drive to ~22 cm away.
+#
+# PHASE 3 — SPECULARITY PROBE: 360° fine scan measuring echo RELIABILITY.
+#   At each angle fire 5 pings and record the hit rate.
+#     Disk  (curved, diffuse) : high hit rate from every angle.
+#     Triangle (flat, specular): hit rate drops where faces deflect the beam.
+#   Classify by counting echo-dropout zones + distance spikes as backup.
+#
+# HC-SR04 wiring (I/O block, lower-left on the carrier board):
+#   VCC  → 3.3V row (pin 11)    GND  → GND row (pin 10)
+#   Trig → GP12 (I/O row)       Echo → GP13 (I/O row)
+#
+# Deploy: copy onto the board AS code.py for mapping runs.
+
 import time
 import math
 import board
@@ -22,215 +30,328 @@ from motor import StepperMotor
 import telemetry
 from telemetry import log
 
-# ---- motors (same wiring + conventions as code.py) ----
-motor1 = StepperMotor(board.GP15, board.GP16, board.GP17, board.GP18, rpm=8)
-motor2 = StepperMotor(board.GP19, board.GP20, board.GP21, board.GP22, rpm=8)
+motor1 = StepperMotor(board.GP15, board.GP16, board.GP17, board.GP18, rpm=10)
+motor2 = StepperMotor(board.GP19, board.GP20, board.GP21, board.GP22, rpm=10)
 
 led = digitalio.DigitalInOut(board.GP8)
 led.direction = digitalio.Direction.OUTPUT
 led.value = False
 
+us_trig = digitalio.DigitalInOut(board.GP12)
+us_trig.direction = digitalio.Direction.OUTPUT
+us_trig.value = False
+
+us_echo = digitalio.DigitalInOut(board.GP13)
+us_echo.direction = digitalio.Direction.INPUT
+
 # ================= TUNABLE CONSTANTS =================
-FWD_M1, FWD_M2   = 1, -1     # forward = OPPOSITE signs (mirror-mounted motors)
-SPIN_M1, SPIN_M2 = 1, 1      # spin in place = SAME sign
-# positive spin steps = LEFT turn (code.py's STEER_SIGN=1 was verified live)
+FWD_M1, FWD_M2   = -1, 1
+SPIN_M1, SPIN_M2 = -1, -1
+STEPS_PER_DEG     = 12000 / 360
+STEPS_PER_CM      = 200.0
 
-CONTACT_PIN     = None       # TODO: wire microswitch, set e.g. board.GP9
-CONTACT_PRESSED = False      # pull-up wiring: pressed pulls the pin LOW
+# ultrasonic timing
+PING_DELAY   = 0.035
+ECHO_TIMEOUT = 0.04
+MIN_RANGE_CM = 3
+MAX_RANGE_CM = 200
 
-# odometry calibration (from code.py's measured constants)
-STEPS_PER_DEG = 12000 / 360  # FULL_TURN_STEPS = 12000 per 360 in-place turn
-STEPS_PER_CM  = 200.0        # FWD_FAR comment: 1200 steps ~ 6 cm. TODO verify
-                             # with a tape measure before scoring runs.
+# phase 1: lighthouse
+LIGHT_DEG    = 8              # coarse scan step (45 readings — objects are big)
+NEAR_WALL_CM = 25             # below this = adjacent wall, ignore
 
-ARENA_CM      = 120          # barricaded square, robot starts in a corner
-NOSE_CM       = 5            # robot centre -> bumper tip. TODO measure
-WALL_MARGIN_CM = 15          # contact within this of a predicted wall = wall,
-                             # not obstacle (absorbs odometry drift)
+# phase 2: approach
+TARGET_CM    = 40             # standoff for the probe — far enough back to see
+                              # the full shape, not just one face
 
-# find-the-obstacle sweep (boustrophedon lanes from the corner)
-LANE_CM       = 25           # lane spacing; MUST be < smallest shape footprint.
-                             # TODO set after measuring the shapes
-SWEEP_STRIDE  = 1200         # steps per advance while sweeping (~6 cm)
+# phase 3: specularity probe
+PROBE_DEG    = 5              # fine scan step (72 readings — objects are big)
+PROBE_PINGS  = 5              # pings per angle for hit-rate
+HIT_THRESH   = 0.4            # below this = echo dropout
+DROPOUT_MIN  = 2              # dropout zones needed → triangle
+SPIKE_CM     = 4              # distance-jump threshold (vertex transitions)
+SPIKE_MIN    = 2              # spike count needed → triangle
+OBS_FRAC     = 0.65           # obstacle sector = readings < this × median
 
-# boundary hug (bug-style: one contact bit)
-BACK_CM       = 3            # reverse this far after each contact
-TURN_AWAY_DEG  = 25          # turn away from the obstacle after contact
-TURN_TOWARD_DEG = 10         # drift back toward it per contact-less stride
-HUG_STRIDE_CM = 5            # advance per hug step
-MIN_LAP_CM    = 40           # don't test loop closure before this much hugging
-CLOSE_RADIUS_CM = 12         # back within this of first contact = lap closed
-MAX_LAP_CM    = 450          # drift runaway guard (~ perimeter upper bound)
+# flat-face detection (the key triangle signal for large objects)
+FLAT_CM      = 3              # consecutive readings within this = same face
+MIN_FACE_LEN = 3              # at least this many readings to count as a face
+FACE_MIN     = 2              # >= this many flat faces → triangle
 
-# classifier: a "corner" = toward-turning accumulated between two contacts
-BURST_DEG     = 45           # >= this between contacts = corner burst.
-                             # Disk of R>=15cm with 5cm strides needs ~<20deg
-                             # per stride -> threshold gap is huge.
-TRIANGLE_MIN_BURSTS = 2      # 3 corners expected; 2 tolerates one merged/missed
-
-RUN_SECONDS   = 300          # brief: autonomous for 5 minutes
-REPORT_AT     = 280          # force best-guess report by here
+RUN_SECONDS  = 300
 # ====================================================
 
-if CONTACT_PIN is not None:
-    _contact = digitalio.DigitalInOut(CONTACT_PIN)
-    _contact.direction = digitalio.Direction.INPUT
-    _contact.pull = digitalio.Pull.UP
-else:
-    _contact = None
+
+# ---- ultrasonic primitives ----
+
+def ping_cm():
+    us_trig.value = False
+    time.sleep(0.000005)
+    us_trig.value = True
+    time.sleep(0.00001)
+    us_trig.value = False
+    deadline = time.monotonic() + ECHO_TIMEOUT
+    while not us_echo.value:
+        if time.monotonic() > deadline:
+            return -1.0
+    t0 = time.monotonic()
+    while us_echo.value:
+        if time.monotonic() > deadline:
+            return -1.0
+    return (time.monotonic() - t0) * 17150.0
 
 
-def contact():
-    # The single sensing bit of Plan A.
-    return _contact is not None and _contact.value == CONTACT_PRESSED
+def ping_median(n=3):
+    vals = []
+    for _ in range(n):
+        d = ping_cm()
+        if d > MIN_RANGE_CM:
+            vals.append(d)
+        time.sleep(PING_DELAY)
+    if not vals:
+        return -1.0
+    vals.sort()
+    return vals[len(vals) // 2]
 
 
-# ---- dead-reckoning pose (x, y in cm from the start corner; heading deg, 0 = +x) ----
-pose = {"x": 0.0, "y": 0.0, "h": 0.0}
+def ping_probe():
+    vals = []
+    for _ in range(PROBE_PINGS):
+        d = ping_cm()
+        if MIN_RANGE_CM < d < MAX_RANGE_CM:
+            vals.append(d)
+        time.sleep(PING_DELAY)
+    hr = len(vals) / PROBE_PINGS
+    md = -1.0
+    if vals:
+        vals.sort()
+        md = vals[len(vals) // 2]
+    return hr, md
 
 
-def _advance_pose(steps):
-    d = steps / STEPS_PER_CM
-    pose["x"] += d * math.cos(math.radians(pose["h"]))
-    pose["y"] += d * math.sin(math.radians(pose["h"]))
+# ---- motor helpers ----
 
-
-def _turn_pose(steps):
-    pose["h"] = (pose["h"] + steps / STEPS_PER_DEG) % 360
-
-
-def dist_to(x, y):
-    return math.sqrt((pose["x"] - x) ** 2 + (pose["y"] - y) ** 2)
-
-
-async def wait_for_motors(*motors):
-    while any(m.busy for m in motors):
-        await asyncio.sleep(0)
-
-
-async def advance(steps):
-    # Drive forward (negative = reverse) watching the bumper. Returns True on
-    # contact; pose is credited only for the steps actually taken.
-    start = motor1.position
-    motor1.move(FWD_M1 * steps)
-    motor2.move(FWD_M2 * steps)
-    hit = False
+async def wait_motors():
     while motor1.busy or motor2.busy:
-        if steps > 0 and contact():
-            motor1.move_to(motor1.position)
-            motor2.move_to(motor2.position)
-            hit = True
-            break
         await asyncio.sleep(0)
-    _advance_pose((motor1.position - start) * FWD_M1)
-    return hit
 
 
-async def turn_deg(deg):
-    # In-place turn, positive = LEFT. Blind (no contact watch: turning in
-    # place can chatter the bumper against the obstacle - that's fine).
-    steps = int(deg * STEPS_PER_DEG)
-    motor1.move(SPIN_M1 * steps)
-    motor2.move(SPIN_M2 * steps)
-    await wait_for_motors(motor1, motor2)
-    _turn_pose(steps)
+async def drive(cm):
+    motor1.move(FWD_M1 * int(cm * STEPS_PER_CM))
+    motor2.move(FWD_M2 * int(cm * STEPS_PER_CM))
+    await wait_motors()
 
 
-def near_wall():
-    # Is the CONTACT point (nose, not centre) at a predicted wall?
-    nx = pose["x"] + NOSE_CM * math.cos(math.radians(pose["h"]))
-    ny = pose["y"] + NOSE_CM * math.sin(math.radians(pose["h"]))
-    return (nx < WALL_MARGIN_CM or nx > ARENA_CM - WALL_MARGIN_CM
-            or ny < WALL_MARGIN_CM or ny > ARENA_CM - WALL_MARGIN_CM)
+async def turn(deg):
+    motor1.move(SPIN_M1 * int(deg * STEPS_PER_DEG))
+    motor2.move(SPIN_M2 * int(deg * STEPS_PER_DEG))
+    await wait_motors()
 
 
-def snap_to_wall():
-    # Free odometry re-zero: we KNOW where the wall we just touched is.
-    # Snap whichever coordinate the heading says we drove into. (Heading
-    # itself can't be fixed from one contact - left as is.)
-    h = pose["h"] % 360
-    if h < 45 or h >= 315:
-        pose["x"] = ARENA_CM - NOSE_CM
-    elif h < 135:
-        pose["y"] = ARENA_CM - NOSE_CM
-    elif h < 225:
-        pose["x"] = NOSE_CM
-    else:
-        pose["y"] = NOSE_CM
+# ===========================================================
+#  PHASE 1 — LIGHTHOUSE (scan from the corner, zero driving)
+# ===========================================================
+
+async def lighthouse():
+    log("PHASE 1  LIGHTHOUSE — scanning from corner")
+    readings = []
+    step_n = int(LIGHT_DEG * STEPS_PER_DEG)
+    angle = 0.0
+    done = 0
+    total = int(360 * STEPS_PER_DEG)
+
+    while done < total:
+        d = ping_median()
+        readings.append((angle, d))
+        motor1.move(SPIN_M1 * step_n)
+        motor2.move(SPIN_M2 * step_n)
+        await wait_motors()
+        done += step_n
+        angle += LIGHT_DEG
+
+    # separate near-wall from interior
+    interior = [(a, d) for a, d in readings if d > NEAR_WALL_CM]
+    log("lighthouse: ", len(interior), "/", len(readings), " interior readings")
+
+    if len(interior) < 3:
+        log("lighthouse: cannot see interior — try repositioning")
+        return None
+
+    # obstacle = shortest cluster in the interior
+    dists = sorted(d for _, d in interior)
+    median_d = dists[len(dists) // 2]
+    threshold = median_d * OBS_FRAC
+    cluster = [(a, d) for a, d in interior if d < threshold]
+
+    if not cluster:
+        cluster = sorted(interior, key=lambda x: x[1])[:3]
+        log("lighthouse: no clear cluster, using 3 shortest")
+
+    mid = cluster[len(cluster) // 2]
+    log("lighthouse: obstacle ~", int(mid[1]), "cm at ",
+        int(mid[0]), "deg  (", len(cluster), " readings)")
+
+    for i in range(0, len(readings), 12):
+        ch = readings[i:i + 12]
+        log("  ", " ".join("%d:%d" % (int(a), int(d)) for a, d in ch if d > 0))
+
+    return mid[0], mid[1]
 
 
-async def find_obstacle(deadline):
-    # Boustrophedon lanes from the corner. A contact NOT at a predicted wall
-    # is the obstacle. Wall contacts re-zero odometry for free.
-    lane_dir = 1                       # +x first, alternate each lane
-    while time.monotonic() < deadline:
-        hit = await advance(SWEEP_STRIDE)
-        if not hit:
-            continue
-        if not near_wall():
-            log("OBSTACLE at x", int(pose["x"]), "y", int(pose["y"]))
-            return True
-        snap_to_wall()
-        log("wall contact -> re-zeroed: x", int(pose["x"]), "y", int(pose["y"]))
-        # lane end: back off, step one lane over (+y), come back the other way
-        await advance(-int(BACK_CM * STEPS_PER_CM))
-        await turn_deg(90 * lane_dir)
-        if await advance(int(LANE_CM * STEPS_PER_CM)):
-            if not near_wall():
-                log("OBSTACLE (during lane step) x", int(pose["x"]), "y", int(pose["y"]))
-                return True
-            snap_to_wall()           # top wall: sweep done without finding it
-            log("swept to far wall without obstacle contact - re-sweeping")
-        await turn_deg(90 * lane_dir)
-        lane_dir = -lane_dir
-    return False
+# ===========================================================
+#  PHASE 2 — APPROACH (drive to ~TARGET_CM from the obstacle)
+# ===========================================================
 
+async def approach(angle, dist):
+    log("PHASE 2  APPROACH — turning ", int(angle), " deg")
+    await turn(angle)
 
-async def hug_lap(deadline):
-    # Bug-style boundary follow, obstacle kept on the LEFT: on contact back
-    # off and turn RIGHT (away); while contact-less drift LEFT (toward).
-    # Record the toward-turning accumulated between consecutive contacts -
-    # that's the corner detector.
-    first = (pose["x"], pose["y"])
-    samples = []                       # turn_deg accumulated before each contact
-    turn_since = 0.0
-    travelled = 0.0
-    await advance(-int(BACK_CM * STEPS_PER_CM))
-    await turn_deg(-TURN_AWAY_DEG)
-    while time.monotonic() < deadline and travelled < MAX_LAP_CM:
-        hit = await advance(int(HUG_STRIDE_CM * STEPS_PER_CM))
-        travelled += HUG_STRIDE_CM
-        if hit:
-            if near_wall():
-                log("WARNING: wall contact during hug - shape may sit near a wall")
-            samples.append(turn_since)
-            log("contact: turn-since-last", int(turn_since),
-                "x", int(pose["x"]), "y", int(pose["y"]))
-            turn_since = 0.0
-            await advance(-int(BACK_CM * STEPS_PER_CM))
-            await turn_deg(-TURN_AWAY_DEG)
-        else:
-            await turn_deg(TURN_TOWARD_DEG)
-            turn_since += TURN_TOWARD_DEG
-        if travelled > MIN_LAP_CM and dist_to(*first) < CLOSE_RADIUS_CM:
-            log("loop closed after", int(travelled), "cm,", len(samples), "contacts")
+    to_go = dist - TARGET_CM
+    while to_go > 5:
+        step = min(to_go, 15)
+        await drive(step)
+        to_go -= step
+        d = ping_median()
+        if 0 < d <= TARGET_CM + 8:
+            log("approach: in range (", int(d), " cm)")
             break
-    return samples
+        if d > 0:
+            to_go = d - TARGET_CM
+
+    d = ping_median()
+    log("approach: stopped ~", int(d) if d > 0 else "?", "cm from obstacle")
 
 
-def classify(samples):
-    # Corner bursts: contacts where the contact-less toward-turning before
-    # them accumulated >= BURST_DEG. Triangle -> ~3 (its corners); disk ->
-    # ~0 (turning arrives in ~TURN_TOWARD_DEG dribbles every stride).
-    bursts = sum(1 for t in samples if t >= BURST_DEG)
-    verdict = "triangle" if bursts >= TRIANGLE_MIN_BURSTS else "disk"
-    log("classify:", len(samples), "contacts,", bursts, "bursts ->", verdict)
+# ===========================================================
+#  PHASE 3 — SPECULARITY PROBE (hit-rate fine scan)
+# ===========================================================
+
+async def probe():
+    log("PHASE 3  SPECULARITY PROBE — ", PROBE_DEG, " deg steps, ",
+        PROBE_PINGS, " pings each")
+
+    # turn 180° so the obstacle ends up mid-scan (avoids 0/360 wrap)
+    await turn(180)
+
+    readings = []
+    step_n = int(PROBE_DEG * STEPS_PER_DEG)
+    angle = 0.0
+    done = 0
+    total = int(360 * STEPS_PER_DEG)
+
+    while done < total:
+        hr, md = ping_probe()
+        readings.append((angle, hr, md))
+        motor1.move(SPIN_M1 * step_n)
+        motor2.move(SPIN_M2 * step_n)
+        await wait_motors()
+        done += step_n
+        angle += PROBE_DEG
+
+    log("probe: ", len(readings), " readings collected")
+    return readings
+
+
+# ---- classification ----
+
+def count_faces(dists):
+    run = 0
+    faces = 0
+    for i in range(1, len(dists)):
+        if abs(dists[i] - dists[i - 1]) <= FLAT_CM:
+            run += 1
+        else:
+            if run >= MIN_FACE_LEN:
+                faces += 1
+            run = 0
+    if run >= MIN_FACE_LEN:
+        faces += 1
+    return faces
+
+
+def classify(readings):
+    # ---- identify obstacle sector from echoes that returned ----
+    got_echo = [(a, hr, d) for a, hr, d in readings if d > MIN_RANGE_CM]
+    if len(got_echo) < 5:
+        log("classify: too few echoes (", len(got_echo), ")")
+        return "disk"
+
+    dists = sorted(d for _, _, d in got_echo)
+    median_d = dists[len(dists) // 2]
+    threshold = median_d * OBS_FRAC
+
+    obs_hits = [(a, hr, d) for a, hr, d in got_echo if d < threshold]
+    if len(obs_hits) < 2:
+        log("classify: obstacle sector too narrow")
+        return "disk"
+
+    # angular bounds of obstacle (wide margin to catch edges + vertices)
+    margin = PROBE_DEG * 5
+    lo = min(a for a, _, _ in obs_hits) - margin
+    hi = max(a for a, _, _ in obs_hits) + margin
+    sector = [(a, hr, d) for a, hr, d in readings if lo <= a <= hi]
+
+    log("classify: sector ", int(lo), "-", int(hi), " deg, ",
+        len(sector), " readings, threshold ", int(threshold), " cm")
+
+    sd = [d for _, _, d in sector if d > MIN_RANGE_CM]
+
+    # ---- SIGNAL 1: echo-dropout zones (specular misses) ----
+    dropouts = 0
+    in_drop = False
+    for _, hr, _ in sector:
+        if hr < HIT_THRESH:
+            if not in_drop:
+                dropouts += 1
+                in_drop = True
+        else:
+            in_drop = False
+
+    # ---- SIGNAL 2: distance spikes (vertex transitions) ----
+    spikes = 0
+    for i in range(1, len(sd)):
+        if abs(sd[i] - sd[i - 1]) >= SPIKE_CM:
+            spikes += 1
+
+    # ---- SIGNAL 3: flat-face plateaus ----
+    # triangle = 2-3 runs of constant distance (flat faces)
+    # cylinder = 0 (distance always changing on a curve)
+    faces = count_faces(sd)
+
+    # ---- roughness for the log ----
+    if sd:
+        mean = sum(sd) / len(sd)
+        std = math.sqrt(sum((x - mean) ** 2 for x in sd) / len(sd))
+    else:
+        std = 0.0
+
+    # any signal is enough
+    is_tri = (dropouts >= DROPOUT_MIN
+              or spikes >= SPIKE_MIN
+              or faces >= FACE_MIN)
+    verdict = "triangle" if is_tri else "disk"
+
+    log("classify: dropouts=", dropouts, "  spikes=", spikes,
+        "  faces=", faces, "  std=", round(std, 1),
+        " -> ", verdict.upper())
+
+    for a, hr, d in sector:
+        tag = ""
+        if hr < HIT_THRESH:
+            tag = " <<<DROP"
+        log("  %3d deg  hit %3d%%  %s cm%s"
+            % (int(a), int(hr * 100),
+               ("%3d" % int(d)) if d > 0 else "---", tag))
+
     return verdict
 
 
+# ---- reporting ----
+
 async def report(verdict):
-    # LED: solid = disk, blinking = triangle. Telemetry banner repeats too.
-    log("RESULT:", verdict.upper())
+    log("========================================")
+    log("  RESULT:  ", verdict.upper())
+    log("========================================")
     while True:
         led.value = True
         await asyncio.sleep(0.4 if verdict == "triangle" else 3600)
@@ -239,27 +360,38 @@ async def report(verdict):
             await asyncio.sleep(0.4)
 
 
+# ---- main ----
+
 async def main():
     asyncio.create_task(motor1.run())
     asyncio.create_task(motor2.run())
     if telemetry.start():
         asyncio.create_task(telemetry.serve())
 
-    if _contact is None:
-        log("NO CONTACT SENSOR (CONTACT_PIN is None) - refusing to drive.")
-        log("Wire the bumper, set CONTACT_PIN, redeploy.")
-        while True:
-            await asyncio.sleep(1)
+    d = ping_cm()
+    log("boot: ultrasonic =", round(d, 1) if d > 0 else "NO ECHO", "cm")
+    if d < 0:
+        log("HC-SR04 not responding — check Trig->GP12, Echo->GP13, VCC->3V3")
 
     t0 = time.monotonic()
-    deadline = t0 + REPORT_AT
-    samples = []
-    if await find_obstacle(deadline):
-        samples = await hug_lap(deadline)
+
+    result = await lighthouse()
+
+    if result is None:
+        log("FALLBACK: driving toward center, retrying")
+        await turn(45)
+        await drive(45)
+        result = await lighthouse()
+
+    if result:
+        await approach(result[0], result[1])
     else:
-        log("WARNING: no obstacle found before deadline")
-    verdict = classify(samples)
-    log("elapsed", int(time.monotonic() - t0), "s of", RUN_SECONDS)
+        log("FALLBACK: no obstacle found, probing from here")
+
+    data = await probe()
+    verdict = classify(data)
+
+    log("total elapsed ", int(time.monotonic() - t0), " s")
     await report(verdict)
 
 

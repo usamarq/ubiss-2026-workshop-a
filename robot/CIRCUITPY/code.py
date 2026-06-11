@@ -13,8 +13,8 @@ motor1 = StepperMotor(board.GP15, board.GP16, board.GP17, board.GP18, rpm=8)
 motor2 = StepperMotor(board.GP19, board.GP20, board.GP21, board.GP22, rpm=8)
 
 # ---- light sensors (photodiodes) ----
-sensorL = analogio.AnalogIn(board.GP28)
-sensorR = analogio.AnalogIn(board.GP26)
+sensorL = analogio.AnalogIn(board.GP26)
+sensorR = analogio.AnalogIn(board.GP28)
 
 # ---- docking hardware ----
 hall = digitalio.DigitalInOut(board.GP27)
@@ -26,8 +26,8 @@ led.direction = digitalio.Direction.OUTPUT
 led.value = False            # indicator stays OFF until docked AND stationary
 
 # ================= TUNABLE CONSTANTS =================
-FWD_M1, FWD_M2   = 1, -1     # forward = OPPOSITE signs (mirror-mounted motors)
-SPIN_M1, SPIN_M2 = 1, 1      # spin in place = SAME sign
+FWD_M1, FWD_M2   = -1, 1     # forward = OPPOSITE signs (mirror-mounted motors)
+SPIN_M1, SPIN_M2 = -1, -1    # spin in place = SAME sign
 STEER_SIGN       = 1         # set -1 if it steers AWAY from the light
 BRIGHTER_IS_HIGHER = True    # set False if covering a sensor RAISES its number
                              # (only matters when USE_FLICKER = False)
