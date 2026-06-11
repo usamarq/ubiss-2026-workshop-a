@@ -2,7 +2,7 @@
 
 > **Workshop A — Minimalism in Robotics** · UBISS 2026
 > Day 3 · Wed Jun 10 · Lecture · Fort TS128
-> Status: 🟢 in-class notes added (Jun 10) · **slides pending** → inferred parts marked **⟵ verify w/ slides**
+> Status: 🟢 in-class notes added (Jun 10). **Note:** the Wed slide deck on disk covers the *filters/reduction* lecture (→ `day3-filters-plans-and-reduction-algorithms`, reconciled) + *Future Directions* (→ `day3-future-directions`); a separate deck for THIS refinements lecture wasn't in the folder, so the **⟵ verify w/ slides** flags below stand until it appears. The reduction deck independently confirms the shared vocabulary (combinatorial filters, plans-as-filters, Output Simulation, minimal/sufficient).
 > 🧮 = beginner explainer. (This is the instructors' own research line — Sakçak/LaValle's *information transition systems*.)
 
 ## TL;DR

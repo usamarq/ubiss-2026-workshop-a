@@ -1,97 +1,102 @@
-# Filters, Plans & Reduction Algorithms
+# Filters, Plans & Reduction Algorithms ("Reduction of Filters and Plans: Hardness and Algorithms")
 
 > **Workshop A — Minimalism in Robotics** · UBISS 2026
 > Day 3 · Wed Jun 10 · Lecture · Fort TS128
-> Status: 🟢 in-class notes added (Jun 10) · user missed the first minutes · **slides pending** → ⟵ flags
-> 🧮 = beginner explainer — this note is deliberately gentle. (Research area of **O'Kane & Shell**.)
+> Status: 🟢 **reconciled with the Lecture 5 slides** · 🧮 = beginner explainer — deliberately gentle.
+> (Research area of **Shell, Zhang, O'Kane** — the reference list is their papers 2020–2024.)
 
 ## TL;DR (the whole lecture in four sentences)
-A **combinatorial filter** is a tiny machine — circles and arrows — that tracks what a robot knows. Smaller filter = less memory = more minimal robot, so we want to **shrink (reduce) filters** by **merging** states. The shock result: although these look exactly like the automata of classic CS (which are easy to minimize), **finding the smallest filter is NP-hard** — provably "computationally nasty." The escape hatches: **special structures** (no-missing-edges, unitary, once-appearing observations) where shrinking becomes easy, and **fixed-parameter tractability** (fast when some parameter of the problem happens to be small).
+A **combinatorial filter** is a tiny machine — circles and arrows — that tracks what a robot knows. Smaller filter = less memory = more minimal robot, so we want to **reduce** filters by merging states. The shock result: although filters look exactly like classic automata (which minimize in near-linear time), **filter minimization is NP-complete**. The escape hatches: **special structural classes** where it's efficient, and a **fixed-parameter tractable** algorithm whose exponential cost is confined to structural parameters that are often small.
 
 ---
 
-## 1 · What you (probably) missed at the start: the combinatorial filter
-A **combinatorial filter** is a finite-state machine for tracking knowledge:
-- **Circles** = I-states ("what I currently know").
-- **Arrows** = observations ("when you see `y`, move along the `y` arrow").
-- Each circle carries an **output** — the filter's current answer (a color/label).
-- No probabilities anywhere — pure structure. ("Combinatorial" ≈ "discrete, no numbers.")
+## 0 · Why (the slides' framing)
+> *"How much state information is needed to achieve some ends?"*
+- History: the **anti-model manifesto** of behaviour-based robotics — **Brooks (1991) "Intelligence without representation"**, **Connell (1990) "Minimalist mobile robotics"**.
+- This lecture's emphasis is different:
+  1. **Not about saving money** (though memory is costly);
+  2. about uncovering the **indispensable information requirements** of tasks;
+  3. limited-state designs **touch just the essentials**.
+- And the agenda: such designs used to come from **clever humans** → can we **automate them with algorithms?** (= filter reduction).
 
-> 🧮 **Example — the parity filter (from lecture 1).** Task: report whether you've passed an even or odd number of doorways. Two circles: `EVEN` (output: "even") and `ODD` (output: "odd"); the `doorway` observation arrows swap you between them; any other observation loops back to the same circle. That's a complete combinatorial filter — 2 states of memory, always-correct output.
->
-> 🧮 **Your robot runs one too:** the homing loop's `{left-brighter, right-brighter, balanced, lost}` is a 4-state filter whose outputs are actions.
+> 🧮 **Key idea — information bottleneck.** Same picture as an **autoencoder** in ML: force the signal through a narrow waist; compression discards the irrelevant. The slides even set combinatorial filters alongside **Bayesian / Kalman / particle filters** — all are "stateful boxes turning observation streams into outputs"; we want the *smallest* such box.
 
-## 2 · Feedback plans = filters that output actions
-A **feedback plan** maps what-you-know → what-to-do (`π : I-state → action`). Structurally it's **the same object as a filter** — circles, observation arrows — except the outputs are *actions* rather than answers. Consequence: everything in this lecture about shrinking filters applies to shrinking **plans** as well ("concise planning"). Passive task → filter; active task → feedback plan (yesterday's split).
+## 1 · The objects
+**Combinatorial filter** = finite-state machine for tracking knowledge: **circles** = I-states, **arrows** = observations, each circle carries an **output** (the current answer). No probabilities.
+- Slide example: **"Are they together or apart?"** (Tovar et al. 2014) — a filter whose outputs are `Together`/`Apart`, then its **minimized** version: same answers, fewer states.
+- 🧮 You've already built two: the parity counter (2 states), and the robot's homing loop (`{left, right, balanced, lost}`).
 
-## 3 · Classic automata vs filters — the concept ⭐
-This is the heart of the lecture:
+**Feedback plan** = the same object with **action outputs**. Slide example: a grid robot with observations `{bump, ¬bump}` and actions `{Forward, Left turn, Right turn, Stop}` reaching a goal `G`. Filters output *information*; plans output *actions* — one theory covers both.
+
+## 2 · Minimization: automata vs filters ⭐ (the core table)
 
 | | **Classic automaton (DFA)** | **Combinatorial filter** |
 |---|---|---|
-| Looks like | circles + labeled arrows | circles + labeled arrows (same!) |
-| Job | read a **whole string**, then say **accept/reject** once at the end | give a **correct output at every step**, forever, as observations stream in |
-| Which inputs matter | **all** strings | only the **feasible** observation sequences (ones the physical world can actually produce) |
-| Minimization | **EASY** — polynomial time (taught in every CS course; Myhill–Nerode / Hopcroft) | **NP-HARD** — no known fast algorithm, likely none exists |
+| Correctness notion | language equality `L(A_in) = L(A_out)` | **Output Simulation** (below) |
+| What matters | all strings | only **feasible** strings — *"the world's structure ⇒ only some strings will ever arise"* |
+| Minimization | **Θ(\|V\| log \|V\|)** — Myhill–Nerode (1958) / Hopcroft | **NP-complete** |
 
-> 🧮 **The punchline in one breath:** two machines that *look identical* have wildly different minimization difficulty, because the filter's job is subtly different (always-on outputs + only feasible sequences). The lecture's message: *our intuition from classic CS does not transfer — robot-knowledge compression is fundamentally harder than language recognition.*
+> **Output Simulation (the filter-correctness definition, verbatim):** *Filter F is output simulated by G if, for every input string that F can take, G takes that input string and produces an output matching F's.* — i.e. the small filter must answer identically on every observation sequence the world can actually produce. This replaces "same language" as what minimization must preserve.
 
-## 4 · Quick complexity primer (P, NP, NP-hard)
-> 🧮 - **P** = problems solvable **fast** (polynomial time) — e.g. sorting, shortest path, DFA minimization.
-> - **NP** = problems where a proposed answer can be **checked** fast, even if *finding* one might be slow.
-> - **NP-hard** = at least as hard as everything in NP. No polynomial algorithm is known for any NP-hard problem, and it's widely believed none exists (the P ≠ NP conjecture). Practical translation: **exact answers don't scale** — for big instances you must approximate, exploit structure, or wait forever.
+> 🧮 **The punchline:** same picture, different correctness notion, *opposite* complexity. Intuitions from classic CS do not transfer.
 
-## 5 · Reduction by merging — and why it's hard
-The natural shrinking algorithm: **merge** states that are *compatible* — same output, and their onward arrows can be made to agree. Repeat until nothing merges. (This is exactly how DFA minimization works, where it succeeds perfectly.)
+## 3 · Complexity theory "in a nutshell" (as presented)
+- Complexity theory **relates classes of problems**; you commit to a model of computation; and it's often about **"justifying bad news"** — the famous Garey & Johnson cartoon, three captions: *"I can't find an efficient algorithm…*
+  1. *…I guess I'm just too dumb."* → 2. *…because no such algorithm is possible!"* (what we'd love to say) → 3. *…but neither can all these famous people."* (what NP-hardness actually gives us).
+- **P ⊆ NP**; whether **P = NP** is open — results are conditional on widely-held assumptions.
+- Nice slide line: you don't have to care about the computational device — complexity is *"a prism through which quite robust distinctions become visible to the naked eye."*
 
-> 🧮 **Why it breaks for filters — the dinner-party analogy.** Compatibility is **not transitive**: state A may be compatible with B, and B with C, while **A clashes with C**. So "who can merge with whom" is like seating guests at the fewest tables when some pairs can't sit together — and *that* is graph coloring, a famously NP-hard problem. Greedy merging can lock you into a bad seating: merge A+B first, and C ends up needing its own table; merge B+C first, and you'd have done better. **Order matters, choices interact globally — that's where the hardness lives.** (DFA states don't have this problem: their "indistinguishability" IS transitive, so merging is safe in any order.)
+## 4 · The reduction algorithm (and where hardness bites)
+Pipeline from the slides, for FM(DF→DF) (deterministic-filter → deterministic-filter minimization):
+1. **Input filter** → build the **compatibility graph**: states `w_i, w_j` are **compatible** iff *their outputs agree on all their common extensions* (no future observation sequence makes them answer differently).
+2. Find a **Minimum Clique Cover** of the compatibility graph — cover all states with the fewest fully-mutually-compatible groups; each clique becomes one merged state.
 
-In practice: heuristic merge orders, or encode the conflict structure (graph coloring / clique-cover style) and feed it to a solver for exact answers on small filters. **⟵ verify w/ slides for the exact algorithm(s) shown**
+> 🧮 **Dinner-party intuition still applies:** compatibility is not transitive (A~B, B~C, yet A✗C), so grouping into fewest tables = clique cover (equivalently, coloring the conflict graph) — **NP-hard**. *This* is where the hardness lives.
 
-## 6 · The "edge cases" — special structures where reduction gets easy
-Hardness is **fragile**: restrict the filter's shape a bit and minimization drops into P. The lecture's named cases (from Saberifar–O'Kane–Shell's work):
-- **No missing edges** — every state has an arrow for **every** observation (nothing undefined). Removing the "missing edge" freedom removes the bad interactions → **polynomial-time** minimization.
-- **Unitary** — a structural restriction on the filter (exact definition ⟵ **verify w/ slides**) under which minimization is also tractable.
-- **Once-appearing observations** — each observation label appears (essentially) once in the filter, limiting how merge choices can interact → tractable.
+3. **Zipper constraints:** merging two states forces other merges downstream (their successors must also agree — the merge "zips" forward along transitions). With multiple outputs per state these constraints live on a **compatibility simplicial complex**, and there can be exponentially many — so they're represented **implicitly in a SAT formulation** (solve exactly with a SAT solver; Zhang, Rahmani, Shell & O'Kane, ICRA 2021).
 
-> 🧮 **The meta-lesson** (more exam-relevant than the definitions): *NP-hardness is a statement about the worst case of the general problem.* Real filters often have special structure — and identifying structure that restores tractability is itself a research contribution. "Hard in general, easy in your case" is a perfectly good engineering outcome.
+## 5 · Efficient special cases (the "edge cases")
+The slides showed a **hierarchy of special classes** where minimization is efficient (Zhang & Shell, ICRA 2023 — "a general class of combinatorial filters that can be minimized efficiently"):
+- **no-missing-edge** — every state has an arrow for every observation;
+- **unitary**;
+- **once-appearing-observation** — an observation label appears only once;
+- nested inside broader notions: *neighborhood-comparable* ⊂ … ⊂ *globally-language-comparable* (the general efficient class).
 
-## 7 · Parameterized complexity & FPT
-> 🧮 **Fixed-parameter tractable (FPT)** = the runtime looks like `f(k) · poly(n)`: possibly horrible in some **parameter k**, but only polynomial in the input size n. If k is **small in practice**, the problem is effectively fast even though it's NP-hard in general.
->
-> 🧮 **Analogy:** re-shelving a library of n books is brutal in general — but if only **k** books are misplaced, you can fix it quickly for small k, no matter how big the library. The exponential pain is *quarantined inside k*.
+> 🧮 **Meta-lesson (more exam-worthy than the definitions):** NP-completeness is about the *general worst case*. Restrict the filter's shape and the problem can drop into P — *hardness is fragile, and finding the tractable structure is the research contribution.*
 
-For filter reduction: NP-hard overall, but **FPT in a suitable parameter** (which parameter was used ⟵ **verify w/ slides**) — so meaningful reductions are computable when that parameter stays small.
+## 6 · Fixed-parameter tractability (FPT)
+- **Definition (Flum & Grohe):** an NP-hard problem is **FPT** if some algorithm solves it in **`f(k) · n^O(1)`** time, where `k` is a parameter of the instance — all the exponential pain is confined to `k`.
+- 🧮 Slide warm-up example — **SAT**: with `k` variables and `m` clauses, brute force is `O(2^k · m)`: exponential *only* in k. A formula with millions of clauses but 20 variables is easy.
+- **The filter result (Zhang & Shell, WAFR 2024):** FM(DF→DF) is **FPT** with runtime roughly `O((2+ℓ)^ω · 2^((β+z)(m+z)) log(m+z) · |V|^O(1))` — the parameters are **structural**: `z` = number of **zipper arcs**, `ω`/`ℓ` = width/height of the zipper graph, `β` = largest clique size, `m` = number of cliques in the smallest cover. **Core idea:** *pick chains to merge and enforce zipper constraints by augmenting a traditional covering problem.*
+- 🧮 Translation: if the filter's *merge-interaction structure* (the zipper graph) is small/shallow — which it often is in practice — exact minimization is feasible even though the general problem is NP-complete.
+
+## 7 · Nondeterminism (the frontier)
+For **plans**, *causal constraints affect nondeterminism* — you can't condition on observations you haven't received — and allowing nondeterministic machines under **output commitment** yields *"automata-like objects that form a genuine new class"* (Zhang & Shell, ICRA 2022 & WAFR 2022). Mentioned as current research; depth not required.
+
+## The summary aphorism (quotable in the exam)
+> **"Compression discards the irrelevant; and whatever remains expresses that which is important."**
 
 ## Why it matters for *minimalism*
-- Filter size = the robot's **memory**. Reduction = mechanically answering "how little memory does this task need?"
-- Yesterday defined the target (**minimal sufficient ITS**); today says **computing it is NP-hard in general** — a profound, slightly ironic result: *even deciding how simple a robot can be is computationally expensive.* This is exam objective #5 verbatim ("problems in robotic complexity reduction that are known to be computationally intractable").
+Filter size = robot memory. Yesterday defined the target (**minimal sufficient ITS**); today: **computing it is NP-complete in general** — *even deciding how simple a robot can be is computationally expensive* — but structure + parameters often rescue practice. This is exam objective #5 verbatim.
 
 ## Connections
-- `day3-refinements-and-dynamic-programming` (the minimal-sufficient object; quotients = what merging implements).
-- `day2-information-spaces` (I-states), `day2-sensor-lattices` (the order in which sensors/filters compare).
-- Your robot: the 4-state homing filter is near-minimal; the docking state machine is a feedback plan.
+- `day3-refinements-and-dynamic-programming` (minimal sufficient object; quotients = what merging implements).
+- `day2-information-spaces`, `day2-sensor-lattices` (Output Simulation is the dynamic cousin of sensor dominance/simulation `h_b = g ∘ h_a`).
+- Behaviour-based history: `day2-minimalism-as-life-philosophy` (Brooks).
 
 ## 🎯 Likely exam points
-- Define a **combinatorial filter** (states = I-states, edges = observations, outputs per state; no probabilities); give a small example (parity).
-- **Filters vs DFAs**: same picture, different job (always-on output vs end verdict; feasible-only inputs) — and **DFA minimization is in P while filter minimization is NP-hard**.
-- Why merging is hard: **compatibility is not transitive** → choices interact (graph-coloring flavor).
-- Name the tractable **special cases** (no-missing-edges, unitary, once-appearing observations) and the meta-lesson.
-- **FPT / parameterized complexity** in one sentence: `f(k)·poly(n)` — exponential confined to a small parameter.
-- **Feedback plan** = filter with action outputs → plan reduction is the same problem family.
+- Define a **combinatorial filter** + give a small example; **feedback plan** = filter with action outputs.
+- **DFA vs filter minimization**: Myhill–Nerode / `Θ(|V| log |V|)` vs **NP-complete**; the role of **feasible strings**; define **Output Simulation**.
+- The algorithm: **compatibility graph → minimum clique cover**, **zipper constraints**, SAT encoding; why greedy merging fails (compatibility not transitive).
+- Name the efficient **special cases** (no-missing-edge, unitary, once-appearing-observation) + the meta-lesson.
+- **FPT**: `f(k)·n^O(1)` (Flum & Grohe); SAT `O(2^k m)` example; filter reduction is FPT in zipper-structure parameters.
 
-## 📝 In-class notes (raw — Jun 10; first minutes missed)
-- Reduction algorithms and filters; **combinatorial filter**; feedback plans.
-- Classic **automata vs filters** comparison.
-- **Computational complexity**: P, NP, NP-hard.
-- **Merging** as the reduction mechanism in the algorithms shown.
-- Special cases: **no-missing edges, unitary, once-appearing observations**.
-- **NP-hardness** of reduction; **fixed-parameter tractability**; **parameterized complexity**.
+## 📝 In-class notes (raw — Jun 10; first minutes missed → §0–1 cover them)
+- Combinatorial filter; reduction algorithms; feedback plans; automata-vs-filters; P/NP; merging; no-missing-edges/unitary/once-appearing; NP-hardness; FPT; parameterized complexity.
 
-## 📎 Slides
-_Pending — drop the deck in `reading_material/lecture_slides/` and I'll reconcile the ⟵ flags (exact algorithms, definition of "unitary," the FPT parameter)._
+## 📚 References (from the deck)
+Brooks 1991 · Connell 1990 · Zhang & Shell WAFR 2024 (FPT) · Zhang & Shell ICRA 2023 (efficient class) · Zhang & Shell WAFR 2022 + ICRA 2022 (nondeterminism) · Zhang, Rahmani, Shell, O'Kane ICRA 2021 (SAT/constraints) · Zhang & Shell WAFR 2020 (cover filters) · Tovar et al. 2014 (together/apart example).
 
 ## ❓ Open questions
-- Exact definition of **unitary** filters as given on the slides.
-- Which **parameter** makes reduction FPT in the result they showed.
-- Did they show the actual **hardness reduction** (from which NP-hard problem)?
+- Precise definition of **unitary** (named on the hierarchy slide but not defined there).
+- The NP-completeness *reduction source* wasn't shown — fine for the exam (the statement + why-it-matters suffice).
